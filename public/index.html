@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>idegy AI Image Vectorizer - Professional Vector Conversion</title>
+    <meta name="description" content="Convert raster images to high-quality SVG vectors with idegy's AI-powered vectorization tool. Built for designers working with Adobe Illustrator, Photoshop, Figma, and Sketch.">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>idegy AI Image Vectorizer</h1>
+            <p class="subtitle">Convert raster images to high-quality SVG vectors • Built for Designers</p>
+            <button class="help-btn" onclick="showHelp()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(255,255,255,0.2); border: none; color: white; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                ❓ Help
+            </button>
+        </header>
+
+        <main>
+            <!-- Method Selection -->
+            <section class="method-selection">
+                <h2>Select Vectorization Method</h2>
+                <div class="methods">
+                    <label class="method-card active" data-method="ai">
+                        <input type="radio" name="method" value="ai" checked>
+                        <div class="method-info">
+                            <h3>AI Vectorization (Recommended)</h3>
+                            <p>Professional-grade AI-powered conversion for complex images and logos</p>
+                        </div>
+                    </label>
+                    <label class="method-card" data-method="potrace">
+                        <input type="radio" name="method" value="potrace">
+                        <div class="method-info">
+                            <h3>Potrace (Fallback)</h3>
+                            <p>Local processing for simple black & white images</p>
+                        </div>
+                    </label>
+                </div>
+            </section>
+
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <div class="upload-mode">
+                    <button class="mode-btn active" data-mode="single">Single Image</button>
+                    <button class="mode-btn" data-mode="batch">Batch Processing</button>
+                </div>
+
+                <!-- Advanced Options -->
+                <div class="advanced-options" style="margin-bottom: 1.5rem;">
+                    <details style="background: var(--surface); padding: 1rem; border-radius: 12px; border: 1px solid var(--border);">
+                        <summary style="cursor: pointer; font-weight: 600; color: var(--idegy-dark-blue);">Advanced Options</summary>
+                        <div style="margin-top: 1rem; display: grid; gap: 1rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="removeBackground" style="width: 18px; height: 18px;">
+                                <span>Remove Background (before vectorization)</span>
+                            </label>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Detail Level:</label>
+                                <select id="detailLevel" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface);">
+                                    <option value="low">Low (Simple shapes)</option>
+                                    <option value="medium" selected>Medium (Balanced)</option>
+                                    <option value="high">High (Maximum detail)</option>
+                                </select>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">Controls how much detail is preserved during vectorization</p>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="drop-zone" id="dropZone">
+                    <svg class="upload-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <h3>Drag & Drop Images Here</h3>
+                    <p>or click to browse</p>
+                    <p class="file-info">Supports: PNG, JPG, JPEG, WEBP (Max 10MB)</p>
+                    <input type="file" id="fileInput" accept="image/png,image/jpeg,image/jpg,image/webp" multiple hidden>
+                </div>
+
+                <div class="file-list" id="fileList"></div>
+            </section>
+
+            <!-- Processing Section -->
+            <section class="processing-section" id="processingSection" style="display: none;">
+                <div class="progress-container">
+                    <div class="spinner"></div>
+                    <p class="processing-text">Vectorizing your images...</p>
+                    <p class="processing-status" id="processingStatus"></p>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <h2>Results</h2>
+                <div class="results-grid" id="resultsGrid"></div>
+                <div class="results-actions">
+                    <button class="btn btn-secondary" id="newConversionBtn">Convert More Images</button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 idegy. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeHelp()">&times;</span>
+            <h2>What is a Vector File?</h2>
+            <p>A vector file uses mathematical formulas to define shapes, making it <strong>infinitely scalable</strong> without losing quality. Unlike pixel-based images, vectors maintain crisp, clean edges at any size.</p>
+
+            <h3>Why Use Vectors?</h3>
+            <ul>
+                <li><strong>Scalability:</strong> Scale up or down infinitely without quality loss</li>
+                <li><strong>Smaller file size:</strong> Generally more efficient than raster images</li>
+                <li><strong>Editability:</strong> Easy to modify colors, shapes, and sizes</li>
+                <li><strong>Professional output:</strong> Standard for logos, branding, and printing</li>
+            </ul>
+
+            <h3>When to Use Each Method</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0;">
+                <div style="background: rgba(0, 118, 206, 0.1); padding: 1rem; border-radius: 8px;">
+                    <h4 style="color: var(--idegy-blue);">AI Vectorization</h4>
+                    <p style="font-size: 0.9rem;">Best for:</p>
+                    <ul style="font-size: 0.85rem;">
+                        <li>Colored logos and illustrations</li>
+                        <li>Complex designs with gradients</li>
+                        <li>Photographs (advanced)</li>
+                        <li>Professional quality output</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(167, 168, 170, 0.1); padding: 1rem; border-radius: 8px;">
+                    <h4 style="color: var(--idegy-gray);">Potrace (Fallback)</h4>
+                    <p style="font-size: 0.9rem;">Best for:</p>
+                    <ul style="font-size: 0.85rem;">
+                        <li>Simple black & white images</li>
+                        <li>Line art and sketches</li>
+                        <li>Icons and basic shapes</li>
+                        <li>Quick local processing</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>Understanding Quality Metrics</h3>
+            <ul>
+                <li><strong>TRUE VECTOR:</strong> Contains only mathematical paths (scales infinitely)</li>
+                <li><strong>Quality Score:</strong> 90-100 = Excellent, 70-89 = Good, 50-69 = Fair</li>
+                <li><strong>Vector Elements:</strong> Number of geometric shapes in the SVG</li>
+                <li><strong>Complexity:</strong> Simple to Very Complex based on detail level</li>
+            </ul>
+
+            <h3>Advanced Features</h3>
+            <ul>
+                <li><strong>Background Removal:</strong> Remove background before vectorization for cleaner results</li>
+                <li><strong>Detail Level:</strong> Control how much detail is preserved (Low/Medium/High)</li>
+                <li><strong>Export Formats:</strong> SVG (web), PDF (print), EPS (legacy), AI (Illustrator)</li>
+            </ul>
+
+            <h3>Tips for Best Results</h3>
+            <ul>
+                <li>Use high-resolution source images (500px+)</li>
+                <li>Ensure good contrast in your original image</li>
+                <li>Use AI method for colored/complex images</li>
+                <li>Remove backgrounds for cleaner vectorization</li>
+                <li>Choose appropriate detail level for your use case</li>
+            </ul>
+
+            <div style="background: rgba(0, 178, 169, 0.1); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                <strong>Pro Tip:</strong> After vectorization, open your SVG in Adobe Illustrator, Figma, or Inkscape for further editing and refinement!
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

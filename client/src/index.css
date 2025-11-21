@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-idegy-blue: #0076CE;
+  --color-idegy-teal: #00B2A9;
+  --color-idegy-darkblue: #003D5C;
+  --color-idegy-lightblue: #E6F4F8;
+  --color-idegy-gray: #F5F7FA;
+}
+
+@layer base {
+  * {
+    border-color: rgb(229 231 235);
+  }
+  body {
+    background-color: rgb(249 250 251);
+    color: rgb(17 24 39);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    background-color: var(--color-idegy-blue);
+    color: white;
+    font-weight: 500;
+    padding: 0.625rem 1.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-idegy-darkblue);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  .btn-secondary {
+    background-color: white;
+    color: rgb(55 65 81);
+    font-weight: 500;
+    padding: 0.625rem 1.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(209 213 219);
+    transition: all 0.2s;
+  }
+
+  .btn-secondary:hover {
+    background-color: rgb(249 250 251);
+  }
+
+  .panel {
+    background-color: white;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+
+  .input-field {
+    width: 100%;
+    padding: 0.625rem 1rem;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.5rem;
+    transition: all;
+    outline: none;
+  }
+
+  .input-field:focus {
+    ring: 2px;
+    ring-color: var(--color-idegy-blue);
+    border-color: var(--color-idegy-blue);
+  }
+
+  .gradient-header {
+    background-image: linear-gradient(to right, var(--color-idegy-blue), var(--color-idegy-teal));
+    color: white;
+  }
+}
