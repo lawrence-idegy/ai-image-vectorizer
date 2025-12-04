@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// API URL configuration - v2.0.1
 // In production, use relative URL (same domain). In dev, use localhost:3000
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000/api');
+const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+const API_URL = import.meta.env.VITE_API_URL || (isProduction ? '/api' : 'http://localhost:3000/api');
+
+console.log('API URL:', API_URL, 'Production:', isProduction);
 
 const api = axios.create({
   baseURL: API_URL,
