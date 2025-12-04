@@ -15,8 +15,8 @@ class BackgroundRemovalService {
       auth: process.env.REPLICATE_API_TOKEN,
     });
 
-    // Using BRIA's background removal model - fast and accurate
-    this.model = 'cjwbw/rembg:fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003';
+    // Using lucataco's remove-bg model - better quality and edge detection
+    this.model = 'lucataco/remove-bg:95fcc2a26d3899cd6c2691c900465aaeff466285a65c14638cc5f36f34befaf1';
   }
 
   /**
@@ -26,7 +26,7 @@ class BackgroundRemovalService {
    */
   async removeBackground(imageDataUri) {
     try {
-      console.log('Removing background with Replicate AI...');
+      console.log('Removing background with Replicate AI (remove-bg model)...');
 
       const input = {
         image: imageDataUri
@@ -40,7 +40,8 @@ class BackgroundRemovalService {
       if (typeof output === 'string') {
         // Fetch the image and convert to data URI
         const response = await fetch(output);
-        const buffer = await response.buffer();
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
         const base64 = buffer.toString('base64');
         return `data:image/png;base64,${base64}`;
       }

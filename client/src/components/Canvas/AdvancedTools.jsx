@@ -8,6 +8,24 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
   const [brushColor, setBrushColor] = useState('#000000');
   const [isDrawingMode, setIsDrawingMode] = useState(false);
 
+  // Helper to get the actual Fabric.js canvas
+  const getCanvas = () => {
+    if (!fabricCanvas) return null;
+    // If it's a ref to CanvasEditor component, use getCanvas()
+    if (fabricCanvas.current?.getCanvas) {
+      return fabricCanvas.current.getCanvas();
+    }
+    // If it's a ref to the canvas directly
+    if (fabricCanvas.current?.renderAll) {
+      return fabricCanvas.current;
+    }
+    // If it's already a canvas
+    if (fabricCanvas.renderAll) {
+      return fabricCanvas;
+    }
+    return null;
+  };
+
   // Filter presets
   const filters = [
     { name: 'Grayscale', icon: 'mdi:invert-colors', apply: () => applyFilter('grayscale') },
@@ -21,12 +39,12 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
   ];
 
   const applyFilter = (filterType) => {
-    if (!fabricCanvas) {
+    const canvas = getCanvas();
+    if (!canvas) {
       alert('Canvas not available');
       return;
     }
 
-    const canvas = fabricCanvas.current || fabricCanvas;
     const obj = activeObject || canvas.getActiveObject();
 
     if (!obj) {
@@ -68,12 +86,12 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
   };
 
   const applyBrightness = (value) => {
-    if (!fabricCanvas) {
+    const canvas = getCanvas();
+    if (!canvas) {
       alert('Canvas not available');
       return;
     }
 
-    const canvas = fabricCanvas.current || fabricCanvas;
     const obj = activeObject || canvas.getActiveObject();
 
     if (!obj || obj.type !== 'image') {
@@ -88,12 +106,12 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
   };
 
   const applyContrast = (value) => {
-    if (!fabricCanvas) {
+    const canvas = getCanvas();
+    if (!canvas) {
       alert('Canvas not available');
       return;
     }
 
-    const canvas = fabricCanvas.current || fabricCanvas;
     const obj = activeObject || canvas.getActiveObject();
 
     if (!obj || obj.type !== 'image') {
@@ -108,9 +126,9 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
   };
 
   const clearFilters = () => {
-    if (!fabricCanvas) return;
+    const canvas = getCanvas();
+    if (!canvas) return;
 
-    const canvas = fabricCanvas.current || fabricCanvas;
     const obj = activeObject || canvas.getActiveObject();
 
     if (!obj) return;
@@ -123,12 +141,12 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
   };
 
   const enableDrawingMode = () => {
-    if (!fabricCanvas) {
+    const canvas = getCanvas();
+    if (!canvas) {
       alert('Canvas not available');
       return;
     }
 
-    const canvas = fabricCanvas.current || fabricCanvas;
     const newDrawingMode = !isDrawingMode;
 
     canvas.isDrawingMode = newDrawingMode;
@@ -143,28 +161,24 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
 
   const updateBrushSize = (size) => {
     setBrushSize(size);
-    if (fabricCanvas) {
-      const canvas = fabricCanvas.current || fabricCanvas;
-      if (canvas.isDrawingMode && canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.width = size;
-      }
+    const canvas = getCanvas();
+    if (canvas && canvas.isDrawingMode && canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.width = size;
     }
   };
 
   const updateBrushColor = (color) => {
     setBrushColor(color);
-    if (fabricCanvas) {
-      const canvas = fabricCanvas.current || fabricCanvas;
-      if (canvas.isDrawingMode && canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.color = color;
-      }
+    const canvas = getCanvas();
+    if (canvas && canvas.isDrawingMode && canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.color = color;
     }
   };
 
   const applyEffect = (effect) => {
-    if (!fabricCanvas) return;
+    const canvas = getCanvas();
+    if (!canvas) return;
 
-    const canvas = fabricCanvas.current || fabricCanvas;
     const obj = activeObject || canvas.getActiveObject();
 
     if (!obj) {
@@ -207,9 +221,9 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
   };
 
   const addGradient = () => {
-    if (!fabricCanvas) return;
+    const canvas = getCanvas();
+    if (!canvas) return;
 
-    const canvas = fabricCanvas.current || fabricCanvas;
     const obj = activeObject || canvas.getActiveObject();
 
     if (!obj) {

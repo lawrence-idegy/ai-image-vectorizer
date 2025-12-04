@@ -80,4 +80,9 @@
     background-image: linear-gradient(to right, var(--color-idegy-blue), var(--color-idegy-teal));
     color: white;
   }
+
+  /* Color picker fix - ensure it fits in container */
+  .color-picker-wrapper .react-colorful {
+    width: 100% !important;
+  }
 }
