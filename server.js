@@ -53,12 +53,13 @@ app.use(sanitizeRequest);
 app.use(preventParamPollution);
 app.use(requestLogger);
 
-// Static files
-app.use(express.static('public'));
-
-// Serve static files from client build in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'client/dist')));
+// Serve static files from client build (prioritize over public folder)
+const clientDistPath = path.join(__dirname, 'client/dist');
+if (require('fs').existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+} else {
+  // Fallback to public folder only if client/dist doesn't exist
+  app.use(express.static('public'));
 }
 
 // Rate limiting
@@ -158,8 +159,8 @@ app.post('/api/cleanup', async (req, res) => {
   res.json(result);
 });
 
-// Catch-all route to serve frontend in production
-if (process.env.NODE_ENV === 'production') {
+// Catch-all route to serve frontend (if client/dist exists)
+if (require('fs').existsSync(path.join(__dirname, 'client/dist/index.html'))) {
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'client/dist/index.html'));
   });
