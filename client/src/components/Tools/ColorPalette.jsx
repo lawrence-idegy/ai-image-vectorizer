@@ -10,19 +10,39 @@ const ColorPalette = ({ svgContent, onColorChange, canvasEditorRef }) => {
   const [showPicker, setShowPicker] = useState(false);
   const [paletteTheme, setPaletteTheme] = useState('complementary');
   const [hasSelection, setHasSelection] = useState(false);
+  const [selectionInfo, setSelectionInfo] = useState(null);
 
-  // Check for canvas selection changes
+  // Check for canvas selection changes and get info about selected object
   useEffect(() => {
     const checkSelection = () => {
       if (canvasEditorRef?.current?.getSelectedObjects) {
         const selected = canvasEditorRef.current.getSelectedObjects();
         setHasSelection(selected.length > 0);
+
+        if (selected.length === 1) {
+          const obj = selected[0];
+          setSelectionInfo({
+            count: 1,
+            type: obj.type || 'shape',
+            fill: obj.fill || 'none',
+            stroke: obj.stroke || 'none',
+          });
+        } else if (selected.length > 1) {
+          setSelectionInfo({
+            count: selected.length,
+            type: 'multiple',
+            fill: null,
+            stroke: null,
+          });
+        } else {
+          setSelectionInfo(null);
+        }
       }
     };
 
     // Check initially and set up an interval
     checkSelection();
-    const interval = setInterval(checkSelection, 500);
+    const interval = setInterval(checkSelection, 300);
     return () => clearInterval(interval);
   }, [canvasEditorRef]);
 
@@ -102,6 +122,18 @@ const ColorPalette = ({ svgContent, onColorChange, canvasEditorRef }) => {
     if (count === 0) {
       alert('No shapes found with this color');
     }
+  };
+
+  // Make the selected shape(s) transparent
+  const handleMakeSelectionTransparent = () => {
+    if (!canvasEditorRef?.current?.makeSelectedTransparent) return;
+    canvasEditorRef.current.makeSelectedTransparent();
+  };
+
+  // Delete the selected shape(s) from canvas
+  const handleDeleteSelection = () => {
+    if (!canvasEditorRef?.current?.deleteSelectedObjects) return;
+    canvasEditorRef.current.deleteSelectedObjects();
   };
 
   const generateSuggestions = () => {
@@ -304,6 +336,71 @@ const ColorPalette = ({ svgContent, onColorChange, canvasEditorRef }) => {
                 <span className="font-medium">Types:</span> {selectedColor.types.join(', ')}
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selected Shape Actions - shows when user clicks shapes on canvas */}
+      {hasSelection && selectionInfo && (
+        <div className="border-t border-gray-200 pt-4 mt-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Icon icon="mdi:selection" className="w-5 h-5 text-blue-600" />
+              <p className="text-sm font-semibold text-blue-800">
+                {selectionInfo.count === 1
+                  ? `1 ${selectionInfo.type} selected`
+                  : `${selectionInfo.count} shapes selected`}
+              </p>
+            </div>
+
+            {/* Show fill/stroke info for single selection */}
+            {selectionInfo.count === 1 && (
+              <div className="flex items-center gap-3 mb-3 text-xs text-gray-600">
+                {selectionInfo.fill && selectionInfo.fill !== 'none' && (
+                  <div className="flex items-center gap-1">
+                    <div
+                      className="w-4 h-4 rounded border border-gray-300"
+                      style={{ backgroundColor: selectionInfo.fill }}
+                    />
+                    <span>Fill</span>
+                  </div>
+                )}
+                {selectionInfo.stroke && selectionInfo.stroke !== 'none' && (
+                  <div className="flex items-center gap-1">
+                    <div
+                      className="w-4 h-4 rounded border-2"
+                      style={{ borderColor: selectionInfo.stroke, backgroundColor: 'transparent' }}
+                    />
+                    <span>Stroke</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Quick action buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleMakeSelectionTransparent}
+                className="flex-1 text-xs py-2 px-3 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg border border-orange-300 transition-colors flex items-center justify-center gap-1"
+                title="Make this shape transparent (keeps shape, removes color)"
+              >
+                <Icon icon="mdi:eye-off-outline" className="w-4 h-4" />
+                Make Transparent
+              </button>
+              <button
+                onClick={handleDeleteSelection}
+                className="flex-1 text-xs py-2 px-3 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg border border-red-300 transition-colors flex items-center justify-center gap-1"
+                title="Delete this shape completely from canvas"
+              >
+                <Icon icon="mdi:delete-outline" className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
+
+            <p className="text-[10px] text-gray-500 mt-2">
+              <Icon icon="mdi:lightbulb-outline" className="w-3 h-3 inline mr-0.5" />
+              Click shapes on canvas to select them individually
+            </p>
           </div>
         </div>
       )}

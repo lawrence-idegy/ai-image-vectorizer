@@ -324,6 +324,44 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
     return canvas.getActiveObjects();
   }, []);
 
+  // Delete the currently selected object(s) - makes them transparent or removes them
+  const makeSelectedTransparent = useCallback(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return false;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length === 0) return false;
+
+    activeObjects.forEach((obj) => {
+      // Make fill and stroke transparent
+      if (obj.fill && obj.fill !== 'transparent') {
+        obj.set('fill', 'transparent');
+      }
+      if (obj.stroke && obj.stroke !== 'transparent') {
+        obj.set('stroke', 'transparent');
+      }
+    });
+
+    canvas.renderAll();
+    saveHistory();
+    return true;
+  }, [saveHistory]);
+
+  // Delete (remove) the currently selected object(s) from canvas
+  const deleteSelectedObjects = useCallback(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return false;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length === 0) return false;
+
+    activeObjects.forEach((obj) => canvas.remove(obj));
+    canvas.discardActiveObject();
+    canvas.renderAll();
+    saveHistory();
+    return true;
+  }, [saveHistory]);
+
   // Select all objects that have a specific color (fill or stroke)
   const selectObjectsByColor = useCallback((targetColor) => {
     const canvas = fabricCanvasRef.current;
@@ -540,24 +578,34 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
         return;
       }
 
-      const svg = fabric.util.groupSVGElements(objects, options);
+      // Calculate SVG dimensions and scale
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
-      const svgWidth = svg.width || svg.getScaledWidth();
-      const svgHeight = svg.height || svg.getScaledHeight();
+      const svgWidth = options.width || 800;
+      const svgHeight = options.height || 600;
 
-      let scale = 1;
-      if (svgWidth && svgHeight) {
-        scale = Math.min((canvasWidth * 0.8) / svgWidth, (canvasHeight * 0.8) / svgHeight);
-        svg.scale(scale);
-      }
+      let scale = Math.min(
+        (canvasWidth * 0.8) / svgWidth,
+        (canvasHeight * 0.8) / svgHeight
+      );
 
-      svg.set({
-        left: (canvasWidth - svgWidth * scale) / 2,
-        top: (canvasHeight - svgHeight * scale) / 2,
+      // Calculate offset to center the SVG
+      const offsetX = (canvasWidth - svgWidth * scale) / 2;
+      const offsetY = (canvasHeight - svgHeight * scale) / 2;
+
+      // Add each object individually (ungrouped) so they can be selected separately
+      objects.forEach((obj) => {
+        if (obj) {
+          obj.set({
+            left: (obj.left || 0) * scale + offsetX,
+            top: (obj.top || 0) * scale + offsetY,
+            scaleX: (obj.scaleX || 1) * scale,
+            scaleY: (obj.scaleY || 1) * scale,
+          });
+          canvas.add(obj);
+        }
       });
 
-      canvas.add(svg);
       canvas.renderAll();
       setIsCanvasEmpty(false);
 
@@ -583,10 +631,12 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
     removeColorFromSelected,
     getSelectedObjects,
     selectObjectsByColor,
+    makeSelectedTransparent,
+    deleteSelectedObjects,
     replaceColorOnCanvas,
     replaceMultipleColorsOnCanvas,
     getCanvas: () => fabricCanvasRef.current,
-  }), [addTextToCanvas, addShapeToCanvas, addImageToCanvas, restoreOriginalSVG, changeBackground, removeObjectBackgrounds, removeColorFromObjects, removeColorFromSelected, getSelectedObjects, selectObjectsByColor, replaceColorOnCanvas, replaceMultipleColorsOnCanvas]);
+  }), [addTextToCanvas, addShapeToCanvas, addImageToCanvas, restoreOriginalSVG, changeBackground, removeObjectBackgrounds, removeColorFromObjects, removeColorFromSelected, getSelectedObjects, selectObjectsByColor, makeSelectedTransparent, deleteSelectedObjects, replaceColorOnCanvas, replaceMultipleColorsOnCanvas]);
 
   // Initialize Fabric.js canvas
   useEffect(() => {
@@ -717,32 +767,35 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
         return;
       }
 
-      const svg = fabric.util.groupSVGElements(objects, options);
-
-      // Scale to fit canvas
+      // Calculate SVG dimensions and scale
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
-      const svgWidth = svg.width || svg.getScaledWidth();
-      const svgHeight = svg.height || svg.getScaledHeight();
+      const svgWidth = options.width || 800;
+      const svgHeight = options.height || 600;
 
-      let scale = 1;
-      if (svgWidth && svgHeight) {
-        scale = Math.min(
-          (canvasWidth * 0.8) / svgWidth,
-          (canvasHeight * 0.8) / svgHeight
-        );
-        svg.scale(scale);
-      }
+      let scale = Math.min(
+        (canvasWidth * 0.8) / svgWidth,
+        (canvasHeight * 0.8) / svgHeight
+      );
 
-      // Center the SVG
-      const scaledWidth = svgWidth * scale;
-      const scaledHeight = svgHeight * scale;
-      svg.set({
-        left: (canvasWidth - scaledWidth) / 2,
-        top: (canvasHeight - scaledHeight) / 2,
+      // Calculate offset to center the SVG
+      const offsetX = (canvasWidth - svgWidth * scale) / 2;
+      const offsetY = (canvasHeight - svgHeight * scale) / 2;
+
+      // Add each object individually (ungrouped) so they can be selected separately
+      objects.forEach((obj) => {
+        if (obj) {
+          // Scale and position each object
+          obj.set({
+            left: (obj.left || 0) * scale + offsetX,
+            top: (obj.top || 0) * scale + offsetY,
+            scaleX: (obj.scaleX || 1) * scale,
+            scaleY: (obj.scaleY || 1) * scale,
+          });
+          canvas.add(obj);
+        }
       });
 
-      canvas.add(svg);
       canvas.renderAll();
 
       // Save initial state after a brief delay
