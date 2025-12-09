@@ -41,15 +41,21 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
     }
   };
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
     if (processedImage && onComplete) {
-      // Convert data URL to File
-      fetch(processedImage)
-        .then(res => res.blob())
-        .then(blob => {
-          const file = new File([blob], 'removed-bg.png', { type: 'image/png' });
-          onComplete(file);
-        });
+      try {
+        setLoading(true);
+        // Convert data URL to File
+        const res = await fetch(processedImage);
+        const blob = await res.blob();
+        const file = new File([blob], 'removed-bg.png', { type: 'image/png' });
+        await onComplete(file);
+      } catch (error) {
+        console.error('Error accepting processed image:', error);
+        alert('Failed to process the image. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -230,14 +236,25 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
               <div className="flex gap-3">
                 <button
                   onClick={handleAccept}
-                  className="btn-primary flex-1 py-3"
+                  disabled={loading}
+                  className="btn-primary flex-1 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Icon icon="mdi:check-bold" className="w-5 h-5 inline mr-2" />
-                  Accept & Continue
+                  {loading ? (
+                    <>
+                      <Icon icon="mdi:loading" className="w-5 h-5 inline mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Icon icon="mdi:check-bold" className="w-5 h-5 inline mr-2" />
+                      Accept & Continue
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => setProcessedImage(null)}
-                  className="btn-secondary px-6 py-3"
+                  disabled={loading}
+                  className="btn-secondary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Icon icon="mdi:refresh" className="w-5 h-5 inline mr-2" />
                   Try Again
