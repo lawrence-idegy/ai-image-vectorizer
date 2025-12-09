@@ -7,18 +7,14 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [processedImage, setProcessedImage] = useState(null);
   const [originalImage, setOriginalImage] = useState(null);
-  const [showComparison, setShowComparison] = useState(false);
   const [sliderPosition, setSliderPosition] = useState(50);
-  const [activeMode, setActiveMode] = useState('ai'); // 'ai', 'manual', 'hybrid'
-  const canvasRef = useRef(null);
+  const [activeMode, setActiveMode] = useState('ai');
   const containerRef = useRef(null);
 
   useEffect(() => {
     if (image) {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setOriginalImage(e.target.result);
-      };
+      reader.onload = (e) => setOriginalImage(e.target.result);
       reader.readAsDataURL(image);
     }
   }, [image]);
@@ -27,10 +23,8 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
     setLoading(true);
     try {
       const result = await removeBackgroundAPI(image);
-
       if (result.image) {
         setProcessedImage(result.image);
-        setShowComparison(true);
       } else {
         alert('Background removal failed. Please try again.');
       }
@@ -46,21 +40,17 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
     if (processedImage && onComplete) {
       try {
         setLoading(true);
-
         const dataUrlParts = processedImage.split(',');
         const mimeMatch = dataUrlParts[0].match(/:(.*?);/);
         const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
         const base64Data = dataUrlParts[1];
-
         const binaryString = atob(base64Data);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
         }
-
         const blob = new Blob([bytes], { type: mimeType });
         const file = new File([blob], 'removed-bg.png', { type: mimeType });
-
         await onComplete(file);
       } catch (error) {
         console.error('Error accepting processed image:', error);
@@ -71,29 +61,18 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
     }
   };
 
-  const handleSliderChange = (e) => {
-    setSliderPosition(e.target.value);
-  };
-
-  // Handle manual mask application (local, no AI)
   const handleManualMaskApply = async (resultDataURL) => {
     setProcessedImage(resultDataURL);
-    setShowComparison(true);
-    setActiveMode('ai'); // Switch to AI mode to show comparison view
+    setActiveMode('ai');
   };
 
-  // Handle manual mask with AI processing
   const handleManualMaskWithAI = async (maskDataURL, mode) => {
     setLoading(true);
     try {
-      const result = await removeBackgroundWithMask(image, maskDataURL, {
-        mode: mode, // 'refine' or 'within'
-      });
-
+      const result = await removeBackgroundWithMask(image, maskDataURL, { mode });
       if (result.image) {
         setProcessedImage(result.image);
-        setShowComparison(true);
-        setActiveMode('ai'); // Switch to show comparison
+        setActiveMode('ai');
       } else {
         alert('Background removal failed. Please try again.');
       }
@@ -106,84 +85,87 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
   };
 
   const modes = [
-    { id: 'ai', label: 'AI Auto', icon: 'mdi:auto-fix', description: 'Automatic AI removal' },
-    { id: 'manual', label: 'Manual', icon: 'mdi:brush', description: 'Select areas manually' },
-    { id: 'hybrid', label: 'AI + Manual', icon: 'mdi:hand-pointing-right', description: 'Manual selection with AI refinement' }
+    { id: 'ai', label: 'AI Auto', icon: 'mdi:auto-fix' },
+    { id: 'manual', label: 'Manual', icon: 'mdi:brush' },
+    { id: 'hybrid', label: 'AI + Manual', icon: 'mdi:vector-combine' }
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+
         {/* Header */}
-        <div className="gradient-header p-4 rounded-t-2xl">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-1">Background Remover</h2>
-              <p className="text-white/80 text-sm">Remove backgrounds with AI or manual selection</p>
+        <div className="bg-gradient-to-r from-idegy-blue to-blue-600 px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <Icon icon="mdi:image-remove" className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Background Remover</h2>
+                <p className="text-white/70 text-xs">Remove backgrounds with AI or manual tools</p>
+              </div>
             </div>
             <button
               onClick={onCancel}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-lg transition-colors"
             >
-              <Icon icon="mdi:close" className="w-6 h-6 text-white" />
+              <Icon icon="mdi:close" className="w-5 h-5 text-white" />
             </button>
           </div>
 
           {/* Mode Tabs */}
-          <div className="flex gap-2">
+          <div className="flex gap-1 mt-4">
             {modes.map(mode => (
               <button
                 key={mode.id}
                 onClick={() => {
                   setActiveMode(mode.id);
                   setProcessedImage(null);
-                  setShowComparison(false);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   activeMode === mode.id
-                    ? 'bg-white text-idegy-blue shadow-md'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'bg-white text-idegy-blue'
+                    : 'bg-white/10 text-white/90 hover:bg-white/20'
                 }`}
               >
-                <Icon icon={mode.icon} className="w-5 h-5" />
-                <span className="font-medium">{mode.label}</span>
+                <Icon icon={mode.icon} className="w-4 h-4" />
+                {mode.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+
           {/* AI Auto Mode */}
           {activeMode === 'ai' && (
-            <>
+            <div className="p-5">
               {!processedImage ? (
-                <div className="space-y-6">
-                  {/* Preview */}
-                  <div className="relative bg-gray-100 rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+                <div className="space-y-4">
+                  {/* Image Preview */}
+                  <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ height: '320px' }}>
                     {originalImage ? (
                       <img
                         src={originalImage}
                         alt="Original"
-                        className="max-w-full max-h-full object-contain"
+                        className="w-full h-full object-contain"
                       />
                     ) : (
-                      <Icon icon="mdi:image-outline" className="w-24 h-24 text-gray-300" />
+                      <div className="flex items-center justify-center h-full">
+                        <Icon icon="mdi:image-outline" className="w-16 h-16 text-gray-300" />
+                      </div>
                     )}
                   </div>
 
-                  {/* Info */}
-                  <div className="bg-idegy-lightblue border-2 border-idegy-blue/20 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <Icon icon="mdi:information" className="w-6 h-6 text-idegy-blue flex-shrink-0 mt-0.5" />
-                      <div className="text-sm">
-                        <p className="font-semibold text-gray-900 mb-1">How it works:</p>
-                        <ul className="space-y-1 text-gray-700">
-                          <li>• AI will detect and remove the background automatically</li>
-                          <li>• Works best with clear subject-background separation</li>
-                          <li>• Result will have transparent background (PNG)</li>
-                          <li>• You can then vectorize the cleaned image</li>
-                        </ul>
+                  {/* Info Box */}
+                  <div className="bg-blue-50 rounded-lg p-3">
+                    <div className="flex gap-2">
+                      <Icon icon="mdi:information" className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                      <div className="text-sm text-gray-700">
+                        <p className="font-medium text-gray-900 mb-1">AI-Powered Removal</p>
+                        <p>Automatically detects and removes backgrounds. Best for images with clear subject separation.</p>
                       </div>
                     </div>
                   </div>
@@ -192,55 +174,45 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
                   <button
                     onClick={handleRemoveBackground}
                     disabled={loading}
-                    className="btn-primary w-full py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-idegy-blue hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {loading ? (
                       <>
-                        <Icon icon="mdi:loading" className="w-6 h-6 inline mr-2 animate-spin" />
+                        <Icon icon="mdi:loading" className="w-5 h-5 animate-spin" />
                         Removing Background...
                       </>
                     ) : (
                       <>
-                        <Icon icon="mdi:scissors-cutting" className="w-6 h-6 inline mr-2" />
-                        Remove Background with AI
+                        <Icon icon="mdi:auto-fix" className="w-5 h-5" />
+                        Remove Background
                       </>
                     )}
                   </button>
                 </div>
               ) : (
-                /* After Processing - Comparison View */
-                <div className="space-y-6">
+                /* Comparison View */
+                <div className="space-y-4">
                   {/* Comparison Slider */}
                   <div
                     ref={containerRef}
-                    className="relative bg-gray-900 rounded-xl overflow-hidden aspect-video"
+                    className="relative bg-gray-900 rounded-lg overflow-hidden"
+                    style={{ height: '320px' }}
                   >
-                    {/* Original Image (Background) */}
                     <img
                       src={originalImage}
                       alt="Original"
                       className="absolute inset-0 w-full h-full object-contain"
                     />
-
-                    {/* Processed Image (Foreground with clip) */}
                     <div
                       className="absolute inset-0"
-                      style={{
-                        clipPath: `inset(0 ${100 - sliderPosition}% 0 0)`,
-                      }}
+                      style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
                     >
-                      {/* Checkerboard pattern for transparency */}
                       <div
                         className="absolute inset-0"
                         style={{
-                          backgroundImage: `
-                            linear-gradient(45deg, #ccc 25%, transparent 25%),
-                            linear-gradient(-45deg, #ccc 25%, transparent 25%),
-                            linear-gradient(45deg, transparent 75%, #ccc 75%),
-                            linear-gradient(-45deg, transparent 75%, #ccc 75%)
-                          `,
-                          backgroundSize: '20px 20px',
-                          backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+                          backgroundImage: `linear-gradient(45deg, #e5e5e5 25%, transparent 25%), linear-gradient(-45deg, #e5e5e5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e5e5 75%), linear-gradient(-45deg, transparent 75%, #e5e5e5 75%)`,
+                          backgroundSize: '16px 16px',
+                          backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px'
                         }}
                       />
                       <img
@@ -249,169 +221,99 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
                         className="absolute inset-0 w-full h-full object-contain"
                       />
                     </div>
-
-                    {/* Slider Line */}
                     <div
-                      className="absolute top-0 bottom-0 w-1 bg-white shadow-lg z-10"
+                      className="absolute top-0 bottom-0 w-0.5 bg-white z-10"
                       style={{ left: `${sliderPosition}%` }}
                     >
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center">
-                        <Icon icon="mdi:drag-vertical" className="w-6 h-6 text-gray-700" />
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center">
+                        <Icon icon="mdi:drag-horizontal-variant" className="w-4 h-4 text-gray-600" />
                       </div>
                     </div>
-
-                    {/* Labels */}
-                    <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg text-white text-sm font-medium">
-                      Original
-                    </div>
-                    <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg text-white text-sm font-medium">
-                      Removed
-                    </div>
+                    <div className="absolute top-3 left-3 bg-black/50 px-2 py-1 rounded text-white text-xs">Original</div>
+                    <div className="absolute top-3 right-3 bg-black/50 px-2 py-1 rounded text-white text-xs">Removed</div>
                   </div>
 
-                  {/* Slider Control */}
-                  <div className="px-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={sliderPosition}
-                      onChange={handleSliderChange}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                      style={{
-                        background: `linear-gradient(to right, #0076CE ${sliderPosition}%, #e5e7eb ${sliderPosition}%)`,
-                      }}
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 mt-2">
-                      <span>Drag to compare</span>
-                      <span>{sliderPosition}%</span>
-                    </div>
-                  </div>
-
-                  {/* Quality Info */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Icon icon="mdi:check-circle" className="w-5 h-5 text-green-600" />
-                        <span className="font-semibold text-gray-900">Background Removed</span>
-                      </div>
-                      <p className="text-sm text-gray-600">Transparent PNG generated</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Icon icon="mdi:sparkles" className="w-5 h-5 text-idegy-blue" />
-                        <span className="font-semibold text-gray-900">AI-Powered</span>
-                      </div>
-                      <p className="text-sm text-gray-600">High-quality edge detection</p>
-                    </div>
-                  </div>
+                  {/* Slider */}
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={sliderPosition}
+                    onChange={(e) => setSliderPosition(e.target.value)}
+                    className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-idegy-blue"
+                  />
 
                   {/* Action Buttons */}
-                  <div className="flex gap-3">
+                  <div className="flex gap-2">
                     <button
                       onClick={handleAccept}
                       disabled={loading}
-                      className="btn-primary flex-1 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {loading ? (
-                        <>
-                          <Icon icon="mdi:loading" className="w-5 h-5 inline mr-2 animate-spin" />
-                          Processing...
-                        </>
+                        <Icon icon="mdi:loading" className="w-4 h-4 animate-spin" />
                       ) : (
-                        <>
-                          <Icon icon="mdi:check-bold" className="w-5 h-5 inline mr-2" />
-                          Accept & Continue
-                        </>
+                        <Icon icon="mdi:check" className="w-4 h-4" />
                       )}
+                      Accept & Continue
                     </button>
                     <button
                       onClick={() => setProcessedImage(null)}
                       disabled={loading}
-                      className="btn-secondary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
-                      <Icon icon="mdi:refresh" className="w-5 h-5 inline mr-2" />
-                      Try Again
+                      <Icon icon="mdi:refresh" className="w-4 h-4" />
+                      Retry
                     </button>
                     <button
                       onClick={() => setActiveMode('manual')}
                       disabled={loading}
-                      className="btn-secondary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Switch to manual mode to refine the result"
+                      className="px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
-                      <Icon icon="mdi:brush" className="w-5 h-5 inline mr-2" />
-                      Manual Refine
+                      <Icon icon="mdi:brush" className="w-4 h-4" />
+                      Refine
                     </button>
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* Manual Mode */}
           {activeMode === 'manual' && originalImage && (
-            <div className="h-[60vh]">
+            <div className="p-4" style={{ height: '500px' }}>
               <ManualMaskEditor
                 imageSrc={originalImage}
                 onApplyMask={handleManualMaskApply}
-                onApplyWithAI={null} // No AI in pure manual mode
+                onApplyWithAI={null}
                 onCancel={() => setActiveMode('ai')}
               />
             </div>
           )}
 
-          {/* Hybrid Mode (Manual + AI) */}
+          {/* Hybrid Mode */}
           {activeMode === 'hybrid' && originalImage && (
-            <div className="h-[60vh]">
-              <div className="mb-4 bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <Icon icon="mdi:lightbulb" className="w-6 h-6 text-purple-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-semibold text-gray-900 mb-1">AI + Manual Mode</p>
-                    <p className="text-gray-700">
-                      Use the selection tools to mark areas, then choose how AI should process your selection:
-                    </p>
-                    <ul className="mt-2 space-y-1 text-gray-600">
-                      <li><strong>AI Refine Edges:</strong> AI cleans up the edges of your selection</li>
-                      <li><strong>AI Within Selection:</strong> AI removes background only inside your selection</li>
-                    </ul>
-                  </div>
+            <div className="p-4" style={{ height: '500px' }}>
+              <div className="mb-3 bg-purple-50 rounded-lg p-3">
+                <div className="flex gap-2">
+                  <Icon icon="mdi:lightbulb-outline" className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium text-gray-900">AI + Manual:</span> Select areas manually, then use AI to refine edges or process within selection.
+                  </p>
                 </div>
               </div>
-              <ManualMaskEditor
-                imageSrc={originalImage}
-                onApplyMask={handleManualMaskApply}
-                onApplyWithAI={handleManualMaskWithAI}
-                onCancel={() => setActiveMode('ai')}
-              />
+              <div style={{ height: 'calc(100% - 56px)' }}>
+                <ManualMaskEditor
+                  imageSrc={originalImage}
+                  onApplyMask={handleManualMaskApply}
+                  onApplyWithAI={handleManualMaskWithAI}
+                  onCancel={() => setActiveMode('ai')}
+                />
+              </div>
             </div>
           )}
         </div>
       </div>
-
-      {/* Custom Slider Styles */}
-      <style jsx>{`
-        .slider::-webkit-slider-thumb {
-          appearance: none;
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: #0076CE;
-          cursor: pointer;
-          border: 3px solid white;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .slider::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: #0076CE;
-          cursor: pointer;
-          border: 3px solid white;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-      `}</style>
     </div>
   );
 };

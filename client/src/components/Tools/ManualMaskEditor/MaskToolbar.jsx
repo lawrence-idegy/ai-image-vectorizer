@@ -1,197 +1,149 @@
 import { Icon } from '@iconify/react';
 
-/**
- * MaskToolbar - Tool selection and settings for manual mask editing
- */
 const MaskToolbar = ({
   activeTool,
   onToolChange,
   toolSettings,
   onSettingsChange,
   onClear,
-  onInvert,
-  onFeather,
-  onGrow,
-  onShrink
+  onInvert
 }) => {
   const tools = [
-    { id: 'magicWand', icon: 'mdi:magic-staff', label: 'Magic Wand', tooltip: 'Click to select similar colors' },
-    { id: 'brush', icon: 'mdi:brush', label: 'Brush', tooltip: 'Paint areas to remove' },
-    { id: 'eraser', icon: 'mdi:eraser', label: 'Eraser', tooltip: 'Erase from selection' },
-    { id: 'lasso', icon: 'mdi:lasso', label: 'Lasso', tooltip: 'Draw freehand selection' }
+    { id: 'magicWand', icon: 'mdi:magic-staff', label: 'Wand' },
+    { id: 'brush', icon: 'mdi:brush', label: 'Brush' },
+    { id: 'eraser', icon: 'mdi:eraser', label: 'Eraser' },
+    { id: 'lasso', icon: 'mdi:lasso', label: 'Lasso' }
   ];
 
   return (
-    <div className="bg-gray-100 rounded-xl p-4 space-y-4">
-      {/* Tool Selection */}
+    <div className="bg-gray-50 rounded-lg p-3 space-y-3 h-full overflow-y-auto">
+      {/* Tools */}
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2 block">
-          Selection Tools
-        </label>
-        <div className="flex gap-2">
+        <div className="text-xs font-medium text-gray-500 uppercase mb-2">Tools</div>
+        <div className="grid grid-cols-4 gap-1">
           {tools.map(tool => (
             <button
               key={tool.id}
               onClick={() => onToolChange(tool.id)}
-              className={`flex flex-col items-center justify-center p-3 rounded-lg transition-all ${
+              className={`flex flex-col items-center py-2 px-1 rounded transition-all ${
                 activeTool === tool.id
-                  ? 'bg-idegy-blue text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                  ? 'bg-idegy-blue text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
               }`}
-              title={tool.tooltip}
+              title={tool.label}
             >
-              <Icon icon={tool.icon} className="w-5 h-5" />
-              <span className="text-xs mt-1">{tool.label}</span>
+              <Icon icon={tool.icon} className="w-4 h-4" />
+              <span className="text-[10px] mt-0.5">{tool.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Tool-specific Settings */}
-      {(activeTool === 'magicWand') && (
-        <div className="space-y-3">
+      {/* Tool Settings */}
+      {activeTool === 'magicWand' && (
+        <div className="space-y-2">
           <div>
-            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 block">
-              Tolerance: {toolSettings.tolerance}
-            </label>
+            <div className="flex justify-between text-xs text-gray-600 mb-1">
+              <span>Tolerance</span>
+              <span>{toolSettings.tolerance}</span>
+            </div>
             <input
               type="range"
               min="0"
               max="255"
               value={toolSettings.tolerance}
               onChange={(e) => onSettingsChange({ ...toolSettings, tolerance: parseInt(e.target.value) })}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer accent-idegy-blue"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Exact</span>
-              <span>Similar</span>
-            </div>
           </div>
-
-          <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-gray-600">
             <input
               type="checkbox"
-              id="contiguous"
               checked={toolSettings.contiguous !== false}
               onChange={(e) => onSettingsChange({ ...toolSettings, contiguous: e.target.checked })}
-              className="w-4 h-4 text-idegy-blue rounded"
+              className="w-3.5 h-3.5 text-idegy-blue rounded"
             />
-            <label htmlFor="contiguous" className="text-sm text-gray-700">
-              Contiguous (connected areas only)
-            </label>
-          </div>
-
-          <div className="text-xs text-gray-500 bg-white p-2 rounded border border-gray-200">
-            <p><strong>Shift+Click:</strong> Add to selection</p>
-            <p><strong>Alt+Click:</strong> Subtract from selection</p>
+            Contiguous
+          </label>
+          <div className="text-[10px] text-gray-400 bg-white rounded p-1.5 border border-gray-100">
+            Shift+Click: Add | Alt+Click: Remove
           </div>
         </div>
       )}
 
       {(activeTool === 'brush' || activeTool === 'eraser') && (
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div>
-            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 block">
-              Brush Size: {toolSettings.brushSize}px
-            </label>
+            <div className="flex justify-between text-xs text-gray-600 mb-1">
+              <span>Size</span>
+              <span>{toolSettings.brushSize}px</span>
+            </div>
             <input
               type="range"
               min="1"
-              max="200"
+              max="100"
               value={toolSettings.brushSize}
               onChange={(e) => onSettingsChange({ ...toolSettings, brushSize: parseInt(e.target.value) })}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer accent-idegy-blue"
             />
           </div>
-
           <div>
-            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 block">
-              Hardness: {toolSettings.hardness}%
-            </label>
+            <div className="flex justify-between text-xs text-gray-600 mb-1">
+              <span>Hardness</span>
+              <span>{toolSettings.hardness}%</span>
+            </div>
             <input
               type="range"
               min="0"
               max="100"
               value={toolSettings.hardness}
               onChange={(e) => onSettingsChange({ ...toolSettings, hardness: parseInt(e.target.value) })}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer accent-idegy-blue"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Soft</span>
-              <span>Hard</span>
-            </div>
           </div>
         </div>
       )}
 
       {activeTool === 'lasso' && (
-        <div className="text-xs text-gray-500 bg-white p-2 rounded border border-gray-200">
-          <p>Click and drag to draw a freehand selection.</p>
-          <p>Release to close and fill the selection.</p>
+        <div className="text-[10px] text-gray-400 bg-white rounded p-1.5 border border-gray-100">
+          Click and drag to draw selection. Release to close.
         </div>
       )}
 
-      {/* Mask Operations */}
+      {/* Actions */}
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2 block">
-          Selection Operations
-        </label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="text-xs font-medium text-gray-500 uppercase mb-2">Selection</div>
+        <div className="flex gap-1">
           <button
             onClick={onInvert}
-            className="flex flex-col items-center p-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-            title="Invert selection"
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-white text-gray-600 text-xs rounded border border-gray-200 hover:bg-gray-50"
           >
-            <Icon icon="mdi:invert-colors" className="w-4 h-4 text-gray-600" />
-            <span className="text-xs text-gray-600 mt-1">Invert</span>
-          </button>
-          <button
-            onClick={onFeather}
-            className="flex flex-col items-center p-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-            title="Feather edges"
-          >
-            <Icon icon="mdi:blur" className="w-4 h-4 text-gray-600" />
-            <span className="text-xs text-gray-600 mt-1">Feather</span>
+            <Icon icon="mdi:invert-colors" className="w-3.5 h-3.5" />
+            Invert
           </button>
           <button
             onClick={onClear}
-            className="flex flex-col items-center p-2 bg-white rounded-lg border border-gray-200 hover:bg-red-50 hover:border-red-200 transition-colors"
-            title="Clear selection"
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-white text-gray-600 text-xs rounded border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
           >
-            <Icon icon="mdi:close-circle" className="w-4 h-4 text-gray-600" />
-            <span className="text-xs text-gray-600 mt-1">Clear</span>
-          </button>
-          <button
-            onClick={onGrow}
-            className="flex flex-col items-center p-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-            title="Expand selection"
-          >
-            <Icon icon="mdi:arrow-expand-all" className="w-4 h-4 text-gray-600" />
-            <span className="text-xs text-gray-600 mt-1">Grow</span>
-          </button>
-          <button
-            onClick={onShrink}
-            className="flex flex-col items-center p-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-            title="Contract selection"
-          >
-            <Icon icon="mdi:arrow-collapse-all" className="w-4 h-4 text-gray-600" />
-            <span className="text-xs text-gray-600 mt-1">Shrink</span>
+            <Icon icon="mdi:close" className="w-3.5 h-3.5" />
+            Clear
           </button>
         </div>
       </div>
 
-      {/* Overlay Opacity */}
+      {/* Overlay */}
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 block">
-          Overlay Opacity: {Math.round(toolSettings.overlayOpacity * 100)}%
-        </label>
+        <div className="flex justify-between text-xs text-gray-600 mb-1">
+          <span>Overlay</span>
+          <span>{Math.round(toolSettings.overlayOpacity * 100)}%</span>
+        </div>
         <input
           type="range"
           min="10"
           max="90"
           value={toolSettings.overlayOpacity * 100}
           onChange={(e) => onSettingsChange({ ...toolSettings, overlayOpacity: parseInt(e.target.value) / 100 })}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer accent-idegy-blue"
         />
       </div>
     </div>
