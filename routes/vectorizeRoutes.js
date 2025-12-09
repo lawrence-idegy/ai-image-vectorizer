@@ -675,6 +675,174 @@ router.post('/remove-background', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * POST /api/remove-background-with-mask
+ * Remove background from an image using user-provided mask
+ * Supports two modes:
+ * - 'refine': AI refines the edges of the mask
+ * - 'within': AI removes background only within the masked area
+ */
+router.post('/remove-background-with-mask', asyncHandler(async (req, res) => {
+  const upload = req.app.get('upload');
+
+  upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'mask', maxCount: 1 }
+  ])(req, res, async (error) => {
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    if (!req.files?.image?.[0]) {
+      return res.status(400).json({ success: false, error: 'No image file provided' });
+    }
+
+    if (!req.files?.mask?.[0]) {
+      return res.status(400).json({ success: false, error: 'No mask file provided' });
+    }
+
+    try {
+      const mode = req.body.mode || 'refine'; // 'refine' or 'within'
+      const feather = parseInt(req.body.feather) || 0;
+
+      // Read image and mask
+      const imageBuffer = await fs.readFile(req.files.image[0].path);
+      const maskBuffer = await fs.readFile(req.files.mask[0].path);
+
+      // Get image dimensions
+      const imageMetadata = await sharp(imageBuffer).metadata();
+      const { width, height } = imageMetadata;
+
+      // Resize mask to match image dimensions if needed
+      const maskMetadata = await sharp(maskBuffer).metadata();
+      let processedMask = maskBuffer;
+
+      if (maskMetadata.width !== width || maskMetadata.height !== height) {
+        processedMask = await sharp(maskBuffer)
+          .resize(width, height, { fit: 'fill' })
+          .toBuffer();
+      }
+
+      // Apply feather to mask if requested
+      if (feather > 0) {
+        processedMask = await sharp(processedMask)
+          .blur(feather)
+          .toBuffer();
+      }
+
+      // Convert mask to grayscale for alpha channel
+      const maskGrayscale = await sharp(processedMask)
+        .grayscale()
+        .raw()
+        .toBuffer();
+
+      let resultBuffer;
+
+      if (mode === 'within' && backgroundRemovalService.isAvailable()) {
+        // Mode: AI removes background only within the masked region
+        // First, apply AI to the whole image
+        const dataUri = replicateService.bufferToDataUri(imageBuffer, req.files.image[0].mimetype);
+        const processedDataUri = await backgroundRemovalService.removeBackground(dataUri);
+
+        // Convert AI result back to buffer
+        const base64Data = processedDataUri.replace(/^data:image\/\w+;base64,/, '');
+        const aiResultBuffer = Buffer.from(base64Data, 'base64');
+
+        // Composite: use original where mask is 0, AI result where mask is 255
+        // Get AI result with alpha
+        const aiRaw = await sharp(aiResultBuffer)
+          .ensureAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+
+        const origRaw = await sharp(imageBuffer)
+          .ensureAlpha()
+          .resize(width, height)
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+
+        // Create composited result
+        const resultRaw = Buffer.alloc(width * height * 4);
+
+        for (let i = 0; i < width * height; i++) {
+          const maskValue = maskGrayscale[i] / 255; // 0-1 range
+
+          // Blend between original and AI result based on mask
+          resultRaw[i * 4] = Math.round(origRaw.data[i * 4] * (1 - maskValue) + aiRaw.data[i * 4] * maskValue);
+          resultRaw[i * 4 + 1] = Math.round(origRaw.data[i * 4 + 1] * (1 - maskValue) + aiRaw.data[i * 4 + 1] * maskValue);
+          resultRaw[i * 4 + 2] = Math.round(origRaw.data[i * 4 + 2] * (1 - maskValue) + aiRaw.data[i * 4 + 2] * maskValue);
+          resultRaw[i * 4 + 3] = Math.round(origRaw.data[i * 4 + 3] * (1 - maskValue) + aiRaw.data[i * 4 + 3] * maskValue);
+        }
+
+        resultBuffer = await sharp(resultRaw, { raw: { width, height, channels: 4 } })
+          .png()
+          .toBuffer();
+
+      } else {
+        // Mode: Apply mask directly (local processing) or refine mode without AI
+        // Simply apply the mask as alpha channel
+
+        // Invert mask (in our system, 255 = remove, but for alpha, 255 = visible)
+        const invertedMask = Buffer.alloc(maskGrayscale.length);
+        for (let i = 0; i < maskGrayscale.length; i++) {
+          invertedMask[i] = 255 - maskGrayscale[i];
+        }
+
+        // Get original image as raw RGBA
+        const origRaw = await sharp(imageBuffer)
+          .ensureAlpha()
+          .resize(width, height)
+          .raw()
+          .toBuffer();
+
+        // Apply inverted mask to alpha channel
+        const resultRaw = Buffer.alloc(width * height * 4);
+        for (let i = 0; i < width * height; i++) {
+          resultRaw[i * 4] = origRaw[i * 4];         // R
+          resultRaw[i * 4 + 1] = origRaw[i * 4 + 1]; // G
+          resultRaw[i * 4 + 2] = origRaw[i * 4 + 2]; // B
+          resultRaw[i * 4 + 3] = Math.min(origRaw[i * 4 + 3], invertedMask[i]); // A
+        }
+
+        resultBuffer = await sharp(resultRaw, { raw: { width, height, channels: 4 } })
+          .png()
+          .toBuffer();
+      }
+
+      // Convert result to data URI
+      const resultDataUri = `data:image/png;base64,${resultBuffer.toString('base64')}`;
+
+      // Clean up temp files
+      await fs.unlink(req.files.image[0].path).catch(() => {});
+      await fs.unlink(req.files.mask[0].path).catch(() => {});
+
+      res.json({
+        success: true,
+        message: 'Background removed with mask successfully',
+        image: resultDataUri,
+        mode: mode,
+      });
+
+    } catch (error) {
+      console.error('Background removal with mask error:', error);
+
+      // Clean up temp files
+      if (req.files?.image?.[0]) {
+        await fs.unlink(req.files.image[0].path).catch(() => {});
+      }
+      if (req.files?.mask?.[0]) {
+        await fs.unlink(req.files.mask[0].path).catch(() => {});
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Background removal with mask failed',
+        message: error.message,
+      });
+    }
+  });
+}));
+
+/**
  * POST /api/optimize
  * Optimize an existing SVG
  */

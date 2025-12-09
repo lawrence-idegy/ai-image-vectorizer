@@ -125,6 +125,43 @@ export const removeBackground = async (file) => {
   return response.data;
 };
 
+// Background removal with mask
+export const removeBackgroundWithMask = async (file, maskDataURL, options = {}) => {
+  const formData = new FormData();
+  formData.append('image', file);
+
+  // Convert mask data URL to blob
+  const maskBlob = await dataURLtoBlob(maskDataURL);
+  formData.append('mask', maskBlob, 'mask.png');
+
+  if (options.mode) formData.append('mode', options.mode); // 'refine' or 'within'
+  if (options.feather) formData.append('feather', options.feather.toString());
+
+  const response = await api.post('/remove-background-with-mask', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data;
+};
+
+// Helper function to convert data URL to Blob
+const dataURLtoBlob = async (dataURL) => {
+  const parts = dataURL.split(',');
+  const mimeMatch = parts[0].match(/:(.*?);/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+  const base64Data = parts[1];
+
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  return new Blob([bytes], { type: mimeType });
+};
+
 // SVG operations
 export const optimizeSVG = async (svgContent, options = {}) => {
   const response = await api.post('/optimize', {
