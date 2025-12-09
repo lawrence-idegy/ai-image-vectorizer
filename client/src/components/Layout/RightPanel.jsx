@@ -17,7 +17,11 @@ function RightPanel({
       <div className="p-4 space-y-4">
         {/* Color Palette */}
         {currentSVG && (
-          <ColorPalette svgContent={currentSVG} onColorChange={onColorChange} />
+          <ColorPalette
+            svgContent={currentSVG}
+            onColorChange={onColorChange}
+            canvasEditorRef={canvasEditorRef}
+          />
         )}
 
         {/* Optimization Stats */}

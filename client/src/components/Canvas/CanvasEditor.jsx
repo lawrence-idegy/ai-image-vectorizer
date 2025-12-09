@@ -279,6 +279,42 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
     saveHistory();
   }, [saveHistory]);
 
+  // Remove specific color from SELECTED objects only
+  const removeColorFromSelected = useCallback((colorToRemove) => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return false;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length === 0) return false;
+
+    const targetColor = normalizeColor(colorToRemove);
+
+    const processObject = (obj) => {
+      if (obj.type === 'group' && obj._objects) {
+        obj._objects.forEach(processObject);
+      }
+
+      if (normalizeColor(obj.fill) === targetColor) {
+        obj.set('fill', 'transparent');
+      }
+      if (normalizeColor(obj.stroke) === targetColor) {
+        obj.set('stroke', 'transparent');
+      }
+    };
+
+    activeObjects.forEach(processObject);
+    canvas.renderAll();
+    saveHistory();
+    return true;
+  }, [saveHistory]);
+
+  // Get the currently selected objects
+  const getSelectedObjects = useCallback(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return [];
+    return canvas.getActiveObjects();
+  }, []);
+
   // Replace a color with another color on all canvas objects
   const replaceColorOnCanvas = useCallback((oldColor, newColor) => {
     const canvas = fabricCanvasRef.current;
@@ -493,10 +529,12 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
     changeBackground,
     removeObjectBackgrounds,
     removeColorFromObjects,
+    removeColorFromSelected,
+    getSelectedObjects,
     replaceColorOnCanvas,
     replaceMultipleColorsOnCanvas,
     getCanvas: () => fabricCanvasRef.current,
-  }), [addTextToCanvas, addShapeToCanvas, addImageToCanvas, restoreOriginalSVG, changeBackground, removeObjectBackgrounds, removeColorFromObjects, replaceColorOnCanvas, replaceMultipleColorsOnCanvas]);
+  }), [addTextToCanvas, addShapeToCanvas, addImageToCanvas, restoreOriginalSVG, changeBackground, removeObjectBackgrounds, removeColorFromObjects, removeColorFromSelected, getSelectedObjects, replaceColorOnCanvas, replaceMultipleColorsOnCanvas]);
 
   // Initialize Fabric.js canvas
   useEffect(() => {

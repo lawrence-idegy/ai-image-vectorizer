@@ -3,12 +3,28 @@ import { HexColorPicker } from 'react-colorful';
 import { Icon } from '@iconify/react';
 import { ColorExtractor } from '../../services/colorExtractor';
 
-const ColorPalette = ({ svgContent, onColorChange }) => {
+const ColorPalette = ({ svgContent, onColorChange, canvasEditorRef }) => {
   const [colors, setColors] = useState([]);
   const [selectedColor, setSelectedColor] = useState(null);
   const [newColor, setNewColor] = useState('#000000');
   const [showPicker, setShowPicker] = useState(false);
   const [paletteTheme, setPaletteTheme] = useState('complementary');
+  const [hasSelection, setHasSelection] = useState(false);
+
+  // Check for canvas selection changes
+  useEffect(() => {
+    const checkSelection = () => {
+      if (canvasEditorRef?.current?.getSelectedObjects) {
+        const selected = canvasEditorRef.current.getSelectedObjects();
+        setHasSelection(selected.length > 0);
+      }
+    };
+
+    // Check initially and set up an interval
+    checkSelection();
+    const interval = setInterval(checkSelection, 500);
+    return () => clearInterval(interval);
+  }, [canvasEditorRef]);
 
   useEffect(() => {
     if (svgContent) {
@@ -43,7 +59,8 @@ const ColorPalette = ({ svgContent, onColorChange }) => {
     setShowPicker(false);
   };
 
-  const handleMakeTransparent = () => {
+  // Remove color from ALL objects (global)
+  const handleMakeTransparentGlobal = () => {
     if (!selectedColor) return;
 
     const updatedSvg = ColorExtractor.replaceColor(
@@ -59,6 +76,19 @@ const ColorPalette = ({ svgContent, onColorChange }) => {
     setColors(updatedColors);
     setSelectedColor(null);
     setShowPicker(false);
+  };
+
+  // Remove color from SELECTED objects only
+  const handleMakeTransparentSelected = () => {
+    if (!selectedColor || !canvasEditorRef?.current?.removeColorFromSelected) return;
+
+    const success = canvasEditorRef.current.removeColorFromSelected(selectedColor.hex);
+    if (success) {
+      setSelectedColor(null);
+      setShowPicker(false);
+    } else {
+      alert('Please select objects on the canvas first');
+    }
   };
 
   const generateSuggestions = () => {
@@ -176,31 +206,56 @@ const ColorPalette = ({ svgContent, onColorChange }) => {
           />
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
-            <button
-              onClick={handleColorReplace}
-              className="btn-primary flex-1 text-sm py-2"
-            >
-              <Icon icon="mdi:check" className="w-4 h-4 inline mr-1" />
-              Apply
-            </button>
-            <button
-              onClick={handleMakeTransparent}
-              className="flex-1 text-sm py-2 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 rounded-lg border border-gray-300 hover:border-red-300 transition-colors"
-              title="Remove this color completely (make transparent)"
-            >
-              <Icon icon="mdi:eraser" className="w-4 h-4 inline mr-1" />
-              Remove
-            </button>
-            <button
-              onClick={() => {
-                setShowPicker(false);
-                setSelectedColor(null);
-              }}
-              className="btn-secondary text-sm py-2 px-4"
-            >
-              Cancel
-            </button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button
+                onClick={handleColorReplace}
+                className="btn-primary flex-1 text-sm py-2"
+              >
+                <Icon icon="mdi:check" className="w-4 h-4 inline mr-1" />
+                Apply
+              </button>
+              <button
+                onClick={() => {
+                  setShowPicker(false);
+                  setSelectedColor(null);
+                }}
+                className="btn-secondary text-sm py-2 px-4"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {/* Remove Color Options */}
+            <div className="border-t border-gray-200 pt-2">
+              <p className="text-xs text-gray-500 mb-2">Make Transparent:</p>
+              <div className="flex gap-2">
+                {hasSelection && (
+                  <button
+                    onClick={handleMakeTransparentSelected}
+                    className="flex-1 text-sm py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg border border-orange-200 hover:border-orange-300 transition-colors"
+                    title="Remove this color from selected objects only"
+                  >
+                    <Icon icon="mdi:selection" className="w-4 h-4 inline mr-1" />
+                    Selected Only
+                  </button>
+                )}
+                <button
+                  onClick={handleMakeTransparentGlobal}
+                  className="flex-1 text-sm py-2 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 rounded-lg border border-gray-300 hover:border-red-300 transition-colors"
+                  title="Remove this color from ALL objects"
+                >
+                  <Icon icon="mdi:eraser" className="w-4 h-4 inline mr-1" />
+                  {hasSelection ? 'All Objects' : 'Remove All'}
+                </button>
+              </div>
+              {!hasSelection && (
+                <p className="text-xs text-gray-400 mt-2 italic">
+                  <Icon icon="mdi:information-outline" className="w-3 h-3 inline mr-1" />
+                  Tip: Select shapes on canvas to remove color from specific areas only
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
