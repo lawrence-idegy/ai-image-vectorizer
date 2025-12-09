@@ -45,14 +45,28 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
     if (processedImage && onComplete) {
       try {
         setLoading(true);
-        // Convert data URL to File
-        const res = await fetch(processedImage);
-        const blob = await res.blob();
-        const file = new File([blob], 'removed-bg.png', { type: 'image/png' });
+
+        // Convert data URL to File without using fetch (more reliable)
+        // Data URL format: data:image/png;base64,<base64data>
+        const dataUrlParts = processedImage.split(',');
+        const mimeMatch = dataUrlParts[0].match(/:(.*?);/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+        const base64Data = dataUrlParts[1];
+
+        // Decode base64 to binary
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const blob = new Blob([bytes], { type: mimeType });
+        const file = new File([blob], 'removed-bg.png', { type: mimeType });
+
         await onComplete(file);
       } catch (error) {
         console.error('Error accepting processed image:', error);
-        alert('Failed to process the image. Please try again.');
+        alert('Failed to process the image: ' + error.message);
       } finally {
         setLoading(false);
       }
