@@ -43,6 +43,24 @@ const ColorPalette = ({ svgContent, onColorChange }) => {
     setShowPicker(false);
   };
 
+  const handleMakeTransparent = () => {
+    if (!selectedColor) return;
+
+    const updatedSvg = ColorExtractor.replaceColor(
+      svgContent,
+      selectedColor.hex,
+      'none'
+    );
+
+    onColorChange(updatedSvg, selectedColor.hex, 'none');
+
+    // Remove from local state
+    const updatedColors = colors.filter((c) => c.hex !== selectedColor.hex);
+    setColors(updatedColors);
+    setSelectedColor(null);
+    setShowPicker(false);
+  };
+
   const generateSuggestions = () => {
     if (colors.length === 0) return;
 
@@ -165,6 +183,14 @@ const ColorPalette = ({ svgContent, onColorChange }) => {
             >
               <Icon icon="mdi:check" className="w-4 h-4 inline mr-1" />
               Apply
+            </button>
+            <button
+              onClick={handleMakeTransparent}
+              className="flex-1 text-sm py-2 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 rounded-lg border border-gray-300 hover:border-red-300 transition-colors"
+              title="Remove this color completely (make transparent)"
+            >
+              <Icon icon="mdi:eraser" className="w-4 h-4 inline mr-1" />
+              Remove
             </button>
             <button
               onClick={() => {
