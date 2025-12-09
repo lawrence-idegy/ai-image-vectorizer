@@ -385,28 +385,6 @@ function WelcomeScreen() {
           />
         </div>
 
-        {/* New v2.0 Features */}
-        <div className="mt-8 p-4 bg-gradient-to-r from-idegy-teal/10 to-idegy-blue/10 rounded-xl">
-          <h3 className="font-semibold text-gray-800 mb-3">New in v2.0</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <Icon icon="mdi:check-circle" className="w-4 h-4 text-green-500" />
-              <span>Real-time progress tracking</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Icon icon="mdi:check-circle" className="w-4 h-4 text-green-500" />
-              <span>SVG optimization (SVGO)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Icon icon="mdi:check-circle" className="w-4 h-4 text-green-500" />
-              <span>Batch processing</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Icon icon="mdi:check-circle" className="w-4 h-4 text-green-500" />
-              <span>User authentication</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
