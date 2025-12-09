@@ -115,28 +115,41 @@ function RightPanel({
             <h3 className="text-lg font-semibold mb-3">Export</h3>
             <div className="space-y-2">
               {[
-                { format: 'SVG', icon: 'mdi:svg', color: 'text-orange-600', desc: 'Scalable Vector' },
-                { format: 'PNG', icon: 'mdi:file-png-box', color: 'text-blue-600', desc: 'High Quality' },
-                { format: 'PDF', icon: 'mdi:file-pdf-box', color: 'text-red-600', desc: 'Print Ready' },
-                { format: 'EPS', icon: 'mdi:file-document-outline', color: 'text-purple-600', desc: 'Adobe Compatible' },
-                { format: 'AI', icon: 'mdi:adobe', color: 'text-amber-600', desc: 'Adobe Illustrator' },
+                { format: 'SVG', icon: 'mdi:svg', color: 'text-orange-600', desc: 'Scalable Vector', warning: null },
+                { format: 'PNG', icon: 'mdi:file-png-box', color: 'text-blue-600', desc: 'High Quality Image', warning: null },
+                { format: 'PDF', icon: 'mdi:file-pdf-box', color: 'text-red-600', desc: 'Print Ready', warning: null },
+                { format: 'EPS', icon: 'mdi:file-document-outline', color: 'text-purple-600', desc: 'Adobe Compatible', warning: 'PDF-based' },
+                { format: 'AI', icon: 'mdi:adobe', color: 'text-amber-600', desc: 'Adobe Illustrator', warning: 'PDF-based' },
               ].map((item) => (
                 <button
                   key={item.format}
                   onClick={() => onQuickExport(item.format)}
                   className="w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-between group"
+                  title={item.warning ? `${item.format}: ${item.warning} format - opens in Adobe apps` : `Download as ${item.format}`}
                 >
                   <div className="flex items-center gap-3">
                     <Icon icon={item.icon} className={`w-5 h-5 ${item.color}`} />
                     <div className="text-left">
-                      <span className="text-sm font-medium text-gray-700 block">{item.format}</span>
-                      <span className="text-xs text-gray-500">{item.desc}</span>
+                      <span className="text-sm font-medium text-gray-700 block flex items-center gap-1">
+                        {item.format}
+                        {item.warning && (
+                          <Icon icon="mdi:information-outline" className="w-3 h-3 text-amber-500" />
+                        )}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {item.desc}
+                        {item.warning && <span className="text-amber-600 ml-1">({item.warning})</span>}
+                      </span>
                     </div>
                   </div>
                   <Icon icon="mdi:download" className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
                 </button>
               ))}
             </div>
+            <p className="text-[10px] text-gray-400 mt-2 px-1">
+              <Icon icon="mdi:information-outline" className="w-3 h-3 inline mr-0.5" />
+              EPS/AI exports are PDF-based files that open in Adobe applications
+            </p>
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { Icon } from '@iconify/react';
 import { jsPDF } from 'jspdf';
@@ -6,6 +6,15 @@ import 'svg2pdf.js';
 import ObjectProperties from './ObjectProperties';
 import { normalizeColor, isWhiteColor } from '../../utils/colorUtils';
 import { downloadFile, downloadSVGFile } from '../../utils/exportUtils';
+
+// Simple debounce function
+const debounce = (fn, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+};
 
 const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChange, className = '' }, ref) => {
   const canvasRef = useRef(null);
@@ -315,6 +324,48 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
     return canvas.getActiveObjects();
   }, []);
 
+  // Select all objects that have a specific color (fill or stroke)
+  const selectObjectsByColor = useCallback((targetColor) => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return 0;
+
+    const normalizedTarget = normalizeColor(targetColor);
+    const matchingObjects = [];
+
+    const checkObject = (obj) => {
+      // Skip groups - we want to select individual objects
+      if (obj.type === 'group' && obj._objects) {
+        // For groups, check children but don't select the group itself
+        obj._objects.forEach(checkObject);
+        return;
+      }
+
+      const fillMatch = normalizeColor(obj.fill) === normalizedTarget;
+      const strokeMatch = normalizeColor(obj.stroke) === normalizedTarget;
+
+      if (fillMatch || strokeMatch) {
+        matchingObjects.push(obj);
+      }
+    };
+
+    canvas.getObjects().forEach(checkObject);
+
+    if (matchingObjects.length > 0) {
+      // Clear current selection
+      canvas.discardActiveObject();
+
+      if (matchingObjects.length === 1) {
+        canvas.setActiveObject(matchingObjects[0]);
+      } else {
+        const selection = new fabric.ActiveSelection(matchingObjects, { canvas });
+        canvas.setActiveObject(selection);
+      }
+      canvas.renderAll();
+    }
+
+    return matchingObjects.length;
+  }, []);
+
   // Replace a color with another color on all canvas objects
   const replaceColorOnCanvas = useCallback((oldColor, newColor) => {
     const canvas = fabricCanvasRef.current;
@@ -531,10 +582,11 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
     removeColorFromObjects,
     removeColorFromSelected,
     getSelectedObjects,
+    selectObjectsByColor,
     replaceColorOnCanvas,
     replaceMultipleColorsOnCanvas,
     getCanvas: () => fabricCanvasRef.current,
-  }), [addTextToCanvas, addShapeToCanvas, addImageToCanvas, restoreOriginalSVG, changeBackground, removeObjectBackgrounds, removeColorFromObjects, removeColorFromSelected, getSelectedObjects, replaceColorOnCanvas, replaceMultipleColorsOnCanvas]);
+  }), [addTextToCanvas, addShapeToCanvas, addImageToCanvas, restoreOriginalSVG, changeBackground, removeObjectBackgrounds, removeColorFromObjects, removeColorFromSelected, getSelectedObjects, selectObjectsByColor, replaceColorOnCanvas, replaceMultipleColorsOnCanvas]);
 
   // Initialize Fabric.js canvas
   useEffect(() => {
@@ -563,10 +615,10 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
       if (onSelectionChange) onSelectionChange(null);
     });
 
-    // History tracking - only on modifications
-    canvas.on('object:modified', () => {
-      if (!isLoadingRef.current) {
-        const json = JSON.stringify(canvas.toJSON());
+    // History tracking - only on modifications (debounced to prevent race conditions)
+    const debouncedSaveHistory = debounce(() => {
+      if (!isLoadingRef.current && fabricCanvasRef.current) {
+        const json = JSON.stringify(fabricCanvasRef.current.toJSON());
         const currentIndex = historyRef.current.index;
         const newHistory = historyRef.current.history.slice(0, currentIndex + 1);
         newHistory.push(json);
@@ -576,7 +628,9 @@ const CanvasEditor = forwardRef(({ image, svgContent, onExport, onSelectionChang
         setCanvasHistory([...newHistory]);
         setHistoryIndex(newHistory.length - 1);
       }
-    });
+    }, 100);
+
+    canvas.on('object:modified', debouncedSaveHistory);
 
     // Track canvas emptiness
     canvas.on('object:added', () => {

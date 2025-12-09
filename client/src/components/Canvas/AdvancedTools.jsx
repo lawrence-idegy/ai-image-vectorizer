@@ -3,7 +3,7 @@ import { Icon } from '@iconify/react';
 import * as fabric from 'fabric';
 
 const AdvancedTools = ({ fabricCanvas, activeObject }) => {
-  const [activeTab, setActiveTab] = useState('filters');
+  const [activeTab, setActiveTab] = useState('effects');
   const [brushSize, setBrushSize] = useState(10);
   const [brushColor, setBrushColor] = useState('#000000');
   const [isDrawingMode, setIsDrawingMode] = useState(false);
@@ -213,6 +213,9 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
       case 'rounded':
         if (obj.type === 'rect') {
           obj.set({ rx: 20, ry: 20 });
+        } else {
+          alert('Round corners only works on rectangle shapes. Select a rectangle to use this effect.');
+          return;
         }
         break;
     }
@@ -248,54 +251,27 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
     <div className="panel p-4">
       <h3 className="text-lg font-semibold mb-4">Advanced Tools</h3>
 
-      {/* Tabs */}
+      {/* Tabs - Only Effects and Draw (Filters removed - only work on raster images) */}
       <div className="flex gap-2 mb-4 border-b border-gray-200">
-        {['filters', 'effects', 'draw'].map((tab) => (
+        {[
+          { id: 'effects', label: 'Effects', icon: 'mdi:magic-staff' },
+          { id: 'draw', label: 'Draw', icon: 'mdi:draw' }
+        ].map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 font-medium capitalize transition-all relative ${
-              activeTab === tab ? 'text-idegy-blue' : 'text-gray-600'
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 font-medium transition-all relative flex items-center gap-1.5 ${
+              activeTab === tab.id ? 'text-idegy-blue' : 'text-gray-600'
             }`}
           >
-            {tab}
-            {activeTab === tab && (
+            <Icon icon={tab.icon} className="w-4 h-4" />
+            {tab.label}
+            {activeTab === tab.id && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-idegy-blue" />
             )}
           </button>
         ))}
       </div>
-
-      {/* Filters Tab */}
-      {activeTab === 'filters' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            {filters.map((filter) => (
-              <button
-                key={filter.name}
-                onClick={filter.apply}
-                className="p-3 bg-gray-50 hover:bg-idegy-lightblue rounded-lg transition-all text-left flex items-center gap-2 overflow-hidden"
-              >
-                <Icon icon={filter.icon} className="w-5 h-5 flex-shrink-0 text-gray-600" />
-                <span className="text-sm font-medium text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap">{filter.name}</span>
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={clearFilters}
-            className="btn-secondary w-full text-sm overflow-hidden"
-          >
-            <Icon icon="mdi:close-circle" className="w-4 h-4 inline mr-1 flex-shrink-0" />
-            <span className="overflow-hidden text-ellipsis whitespace-nowrap">Clear All Filters</span>
-          </button>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-            <Icon icon="mdi:information" className="w-4 h-4 inline mr-1" />
-            Select an image object to apply filters
-          </div>
-        </div>
-      )}
 
       {/* Effects Tab */}
       {activeTab === 'effects' && (
@@ -304,6 +280,7 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
             <button
               onClick={() => applyEffect('shadow')}
               className="p-3 bg-gray-50 hover:bg-idegy-lightblue rounded-lg transition-all overflow-hidden"
+              title="Add a drop shadow to the selected object"
             >
               <Icon icon="mdi:box-shadow" className="w-6 h-6 mx-auto mb-1 text-gray-600" />
               <p className="text-xs font-medium text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap">Drop Shadow</p>
@@ -312,6 +289,7 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
             <button
               onClick={() => applyEffect('glow')}
               className="p-3 bg-gray-50 hover:bg-idegy-lightblue rounded-lg transition-all overflow-hidden"
+              title="Add a glow effect to the selected object"
             >
               <Icon icon="mdi:lightbulb-on" className="w-6 h-6 mx-auto mb-1 text-gray-600" />
               <p className="text-xs font-medium text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap">Glow</p>
@@ -320,6 +298,7 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
             <button
               onClick={() => applyEffect('opacity')}
               className="p-3 bg-gray-50 hover:bg-idegy-lightblue rounded-lg transition-all overflow-hidden"
+              title="Toggle transparency (50% / 100%)"
             >
               <Icon icon="mdi:opacity" className="w-6 h-6 mx-auto mb-1 text-gray-600" />
               <p className="text-xs font-medium text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap">Transparency</p>
@@ -328,19 +307,27 @@ const AdvancedTools = ({ fabricCanvas, activeObject }) => {
             <button
               onClick={() => applyEffect('rounded')}
               className="p-3 bg-gray-50 hover:bg-idegy-lightblue rounded-lg transition-all overflow-hidden"
+              title="Round corners (rectangles only)"
             >
               <Icon icon="mdi:rounded-corner" className="w-6 h-6 mx-auto mb-1 text-gray-600" />
               <p className="text-xs font-medium text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap">Round Corners</p>
+              <p className="text-[10px] text-gray-400">(rectangles)</p>
             </button>
           </div>
 
           <button
             onClick={addGradient}
             className="btn-primary w-full text-sm overflow-hidden"
+            title="Apply a blue-teal gradient fill"
           >
             <Icon icon="mdi:gradient-horizontal" className="w-4 h-4 inline mr-1 flex-shrink-0" />
             <span className="overflow-hidden text-ellipsis whitespace-nowrap">Apply Gradient</span>
           </button>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+            <Icon icon="mdi:information" className="w-4 h-4 inline mr-1" />
+            Select an object on the canvas first, then apply an effect
+          </div>
         </div>
       )}
 

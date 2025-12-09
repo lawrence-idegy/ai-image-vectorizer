@@ -91,6 +91,19 @@ const ColorPalette = ({ svgContent, onColorChange, canvasEditorRef }) => {
     }
   };
 
+  // Select all shapes with a specific color
+  const handleSelectByColor = (colorHex) => {
+    if (!canvasEditorRef?.current?.selectObjectsByColor) {
+      alert('Canvas not available');
+      return;
+    }
+
+    const count = canvasEditorRef.current.selectObjectsByColor(colorHex);
+    if (count === 0) {
+      alert('No shapes found with this color');
+    }
+  };
+
   const generateSuggestions = () => {
     if (colors.length === 0) return;
 
@@ -158,6 +171,17 @@ const ColorPalette = ({ svgContent, onColorChange, canvasEditorRef }) => {
             <div className="mt-1.5 text-center">
               <p className="text-xs font-mono text-gray-700">{color.hex}</p>
               <p className="text-xs text-gray-500">{color.percentage}%</p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectByColor(color.hex);
+                }}
+                className="text-[10px] text-idegy-blue hover:text-idegy-darkblue hover:underline mt-0.5 flex items-center justify-center gap-0.5"
+                title="Select all shapes with this color on canvas"
+              >
+                <Icon icon="mdi:selection" className="w-3 h-3" />
+                Select
+              </button>
             </div>
           </div>
         ))}

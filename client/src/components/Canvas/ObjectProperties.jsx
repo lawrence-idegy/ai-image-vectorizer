@@ -64,6 +64,8 @@ const ObjectProperties = ({ activeObject, fabricCanvas, onClose }) => {
     }
 
     canvas.renderAll();
+    // Trigger object:modified event to save to history (debounced in CanvasEditor)
+    canvas.fire('object:modified', { target: activeObject });
   };
 
   if (!activeObject) return null;
