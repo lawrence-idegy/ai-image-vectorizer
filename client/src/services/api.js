@@ -111,10 +111,20 @@ export const getSVGPreview = async (filename) => {
   return response.data;
 };
 
+// Background removal models
+export const getBackgroundRemovalModels = async () => {
+  const response = await api.get('/background-removal-models');
+  return response.data;
+};
+
 // Background removal
-export const removeBackground = async (file) => {
+export const removeBackground = async (file, options = {}) => {
   const formData = new FormData();
   formData.append('image', file);
+
+  // Quality preset: 'fast', 'balanced', or 'quality'
+  if (options.quality) formData.append('quality', options.quality);
+  if (options.threshold !== undefined) formData.append('threshold', options.threshold.toString());
 
   const response = await api.post('/remove-background', formData, {
     headers: {

@@ -3,12 +3,42 @@ import { Icon } from '@iconify/react';
 import { removeBackground as removeBackgroundAPI, removeBackgroundWithMask } from '../../services/api';
 import { ManualMaskEditor } from './ManualMaskEditor';
 
+// Quality presets for background removal
+const QUALITY_PRESETS = [
+  {
+    id: 'fast',
+    name: 'Fast',
+    icon: 'mdi:lightning-bolt',
+    description: 'Quick processing (~2s)',
+    detail: 'Best for simple backgrounds',
+    color: 'emerald'
+  },
+  {
+    id: 'balanced',
+    name: 'Balanced',
+    icon: 'mdi:scale-balance',
+    description: 'Good balance (~3s)',
+    detail: 'Works for most images',
+    color: 'blue',
+    recommended: true
+  },
+  {
+    id: 'quality',
+    name: 'High Quality',
+    icon: 'mdi:diamond-stone',
+    description: 'Best edges (~40s)',
+    detail: 'Fine details, hair, spikes',
+    color: 'purple'
+  }
+];
+
 const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [processedImage, setProcessedImage] = useState(null);
   const [originalImage, setOriginalImage] = useState(null);
   const [sliderPosition, setSliderPosition] = useState(50);
   const [activeMode, setActiveMode] = useState('ai');
+  const [selectedQuality, setSelectedQuality] = useState('balanced');
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -22,7 +52,7 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
   const handleRemoveBackground = async () => {
     setLoading(true);
     try {
-      const result = await removeBackgroundAPI(image);
+      const result = await removeBackgroundAPI(image, { quality: selectedQuality });
       if (result.image) {
         setProcessedImage(result.image);
       } else {
@@ -145,7 +175,7 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
               {!processedImage ? (
                 <div className="space-y-4">
                   {/* Image Preview */}
-                  <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ height: '320px' }}>
+                  <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ height: '240px' }}>
                     {originalImage ? (
                       <img
                         src={originalImage}
@@ -159,13 +189,64 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
                     )}
                   </div>
 
+                  {/* Quality Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Quality Mode
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {QUALITY_PRESETS.map((preset) => {
+                        const isSelected = selectedQuality === preset.id;
+                        const colorClasses = {
+                          emerald: isSelected ? 'border-emerald-500 bg-emerald-50 ring-emerald-500' : 'hover:border-emerald-300',
+                          blue: isSelected ? 'border-blue-500 bg-blue-50 ring-blue-500' : 'hover:border-blue-300',
+                          purple: isSelected ? 'border-purple-500 bg-purple-50 ring-purple-500' : 'hover:border-purple-300',
+                        };
+                        const iconColorClasses = {
+                          emerald: isSelected ? 'text-emerald-600' : 'text-gray-400',
+                          blue: isSelected ? 'text-blue-600' : 'text-gray-400',
+                          purple: isSelected ? 'text-purple-600' : 'text-gray-400',
+                        };
+
+                        return (
+                          <button
+                            key={preset.id}
+                            onClick={() => setSelectedQuality(preset.id)}
+                            className={`relative p-3 rounded-lg border-2 transition-all text-left ${
+                              isSelected ? `${colorClasses[preset.color]} ring-1` : `border-gray-200 ${colorClasses[preset.color]}`
+                            }`}
+                          >
+                            {preset.recommended && (
+                              <span className="absolute -top-2 right-2 px-1.5 py-0.5 bg-blue-500 text-white text-[10px] font-medium rounded">
+                                Recommended
+                              </span>
+                            )}
+                            <Icon
+                              icon={preset.icon}
+                              className={`w-5 h-5 mb-1 ${iconColorClasses[preset.color]}`}
+                            />
+                            <div className="font-medium text-sm text-gray-900">{preset.name}</div>
+                            <div className="text-xs text-gray-500">{preset.description}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      {QUALITY_PRESETS.find(p => p.id === selectedQuality)?.detail}
+                    </p>
+                  </div>
+
                   {/* Info Box */}
                   <div className="bg-blue-50 rounded-lg p-3">
                     <div className="flex gap-2">
                       <Icon icon="mdi:information" className="w-5 h-5 text-blue-600 flex-shrink-0" />
                       <div className="text-sm text-gray-700">
                         <p className="font-medium text-gray-900 mb-1">AI-Powered Removal</p>
-                        <p>Automatically detects and removes backgrounds. Best for images with clear subject separation.</p>
+                        <p>
+                          {selectedQuality === 'quality'
+                            ? 'High Quality mode uses BiRefNet for best edge preservation. Ideal for logos with fine details like hair, fur, or spikes.'
+                            : 'Automatically detects and removes backgrounds. Best for images with clear subject separation.'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -179,7 +260,7 @@ const BackgroundRemovalTool = ({ image, onComplete, onCancel }) => {
                     {loading ? (
                       <>
                         <Icon icon="mdi:loading" className="w-5 h-5 animate-spin" />
-                        Removing Background...
+                        {selectedQuality === 'quality' ? 'Processing (this may take ~40s)...' : 'Removing Background...'}
                       </>
                     ) : (
                       <>

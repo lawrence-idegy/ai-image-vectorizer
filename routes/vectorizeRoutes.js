@@ -616,8 +616,22 @@ router.get('/methods', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /api/background-removal-models
+ * Get available background removal models
+ */
+router.get('/background-removal-models', asyncHandler(async (req, res) => {
+  const models = backgroundRemovalService.getAvailableModels();
+  res.json({
+    success: true,
+    models,
+    default: 'balanced'
+  });
+}));
+
+/**
  * POST /api/remove-background
  * Remove background from an image using AI
+ * Supports quality parameter: 'fast', 'balanced', or 'quality'
  */
 router.post('/remove-background', asyncHandler(async (req, res) => {
   const upload = req.app.get('upload');
@@ -642,11 +656,18 @@ router.post('/remove-background', asyncHandler(async (req, res) => {
         });
       }
 
+      // Get quality parameter from form data (default: balanced)
+      const quality = req.body.quality || 'balanced';
+      const threshold = req.body.threshold ? parseFloat(req.body.threshold) : undefined;
+
       const imageBuffer = await fs.readFile(req.file.path);
       const dataUri = replicateService.bufferToDataUri(imageBuffer, req.file.mimetype);
 
-      console.log('Starting background removal...');
-      const processedDataUri = await backgroundRemovalService.removeBackground(dataUri);
+      console.log(`Starting background removal with ${quality} quality...`);
+      const processedDataUri = await backgroundRemovalService.removeBackground(dataUri, {
+        quality,
+        threshold
+      });
       console.log('Background removal completed');
 
       // Clean up uploaded file
@@ -656,6 +677,7 @@ router.post('/remove-background', asyncHandler(async (req, res) => {
         success: true,
         message: 'Background removed successfully',
         image: processedDataUri,
+        quality: quality
       });
 
     } catch (error) {
