@@ -93,10 +93,9 @@ function AppContent() {
   };
 
   const handleColorChange = (updatedSVG, oldColor, newColor, colorMap) => {
-    // Update the SVG state for color palette display
-    setCurrentSVG(updatedSVG);
-
-    // Also apply the change to the canvas for undo/redo support
+    // Apply color changes directly to the canvas objects
+    // Do NOT update currentSVG state - that would trigger a full canvas reload
+    // and lose any user modifications (deletions, transforms, etc.)
     if (canvasEditorRef.current) {
       if (colorMap) {
         // Multiple color replacement (palette theme)
