@@ -144,12 +144,6 @@ function AuthModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Demo credentials hint */}
-        {mode === 'login' && (
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg text-center text-sm text-gray-600">
-            <p>Demo: demo@idegy.com / demo123</p>
-          </div>
-        )}
       </div>
     </div>
   );
