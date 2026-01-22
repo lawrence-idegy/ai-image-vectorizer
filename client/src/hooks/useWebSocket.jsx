@@ -1,6 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-const WS_URL = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:3000/ws`;
+// WebSocket URL - use wss:// in production, ws:// in development
+const getWebSocketUrl = () => {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL;
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  // In development with Vite, use port 3000; in production, use same host
+  if (window.location.hostname === 'localhost' && window.location.port === '5173') {
+    return `ws://localhost:3000/ws`;
+  }
+  return `${protocol}//${host}/ws`;
+};
+
+const WS_URL = getWebSocketUrl();
 
 export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false);

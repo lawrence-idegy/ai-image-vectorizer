@@ -10,13 +10,15 @@ const backgroundRemovalService = require('../services/backgroundRemovalService')
 const svgOptimizer = require('../services/svgOptimizer');
 const { validate } = require('../middleware/validation');
 const { asyncHandler, ProcessingError, NotFoundError } = require('../utils/errors');
+const { requireAuth } = require('../services/authService');
 const { apiLogger } = require('../utils/logger');
 
 /**
  * POST /api/vectorize
  * Convert a single image to SVG vector
+ * Requires authentication with @idegy.com email
  */
-router.post('/vectorize', asyncHandler(async (req, res) => {
+router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
   const upload = req.app.get('upload');
   const cacheService = req.app.get('cache');
   const websocketService = req.app.get('websocket');
@@ -264,8 +266,9 @@ router.post('/vectorize', asyncHandler(async (req, res) => {
 /**
  * POST /api/vectorize/batch
  * Convert multiple images to SVG vectors with real-time progress
+ * Requires authentication with @idegy.com email
  */
-router.post('/vectorize/batch', asyncHandler(async (req, res) => {
+router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
   const upload = req.app.get('upload');
   const websocketService = req.app.get('websocket');
   const storageService = req.app.get('storage');
@@ -632,8 +635,9 @@ router.get('/background-removal-models', asyncHandler(async (req, res) => {
  * POST /api/remove-background
  * Remove background from an image using AI
  * Supports quality parameter: 'fast', 'balanced', or 'quality'
+ * Requires authentication with @idegy.com email
  */
-router.post('/remove-background', asyncHandler(async (req, res) => {
+router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => {
   const upload = req.app.get('upload');
 
   upload.single('image')(req, res, async (error) => {
@@ -702,8 +706,9 @@ router.post('/remove-background', asyncHandler(async (req, res) => {
  * Supports two modes:
  * - 'refine': AI refines the edges of the mask
  * - 'within': AI removes background only within the masked area
+ * Requires authentication with @idegy.com email
  */
-router.post('/remove-background-with-mask', asyncHandler(async (req, res) => {
+router.post('/remove-background-with-mask', requireAuth, asyncHandler(async (req, res) => {
   const upload = req.app.get('upload');
 
   upload.fields([
@@ -867,8 +872,9 @@ router.post('/remove-background-with-mask', asyncHandler(async (req, res) => {
 /**
  * POST /api/optimize
  * Optimize an existing SVG
+ * Requires authentication with @idegy.com email
  */
-router.post('/optimize', asyncHandler(async (req, res) => {
+router.post('/optimize', requireAuth, asyncHandler(async (req, res) => {
   const { svgContent, level = 'default', preserveColors = true } = req.body;
 
   if (!svgContent) {
@@ -893,8 +899,9 @@ router.post('/optimize', asyncHandler(async (req, res) => {
 /**
  * POST /api/analyze
  * Analyze an SVG
+ * Requires authentication with @idegy.com email
  */
-router.post('/analyze', asyncHandler(async (req, res) => {
+router.post('/analyze', requireAuth, asyncHandler(async (req, res) => {
   const { svgContent } = req.body;
 
   if (!svgContent) {

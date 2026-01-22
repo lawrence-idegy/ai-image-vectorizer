@@ -29,7 +29,7 @@ const securityMiddleware = helmet({
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, curl, or same-origin requests)
     if (!origin) return callback(null, true);
 
     const allowedOrigins = [
@@ -41,7 +41,11 @@ const corsOptions = {
       process.env.PRODUCTION_URL
     ].filter(Boolean);
 
-    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+    // Allow Railway domains (production deployment)
+    const isRailwayDomain = origin.endsWith('.railway.app') || origin.endsWith('.up.railway.app');
+
+    // Allow if in allowed list, is a Railway domain, or in development mode
+    if (allowedOrigins.includes(origin) || isRailwayDomain || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

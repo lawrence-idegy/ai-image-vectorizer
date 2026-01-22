@@ -12,6 +12,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'idegy-vectorizer-secret-key-change
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
+// Allowed email domains (set via env or default to @idegy.com)
+const ALLOWED_EMAIL_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || 'idegy.com').split(',').map(d => d.trim().toLowerCase());
+
+/**
+ * Check if email domain is allowed
+ */
+const isEmailDomainAllowed = (email) => {
+  if (!email || typeof email !== 'string') return false;
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return false;
+  return ALLOWED_EMAIL_DOMAINS.includes(domain);
+};
+
 class AuthService {
   constructor() {
     // Create a demo user for testing
@@ -42,6 +55,11 @@ class AuthService {
    * Register a new user
    */
   async register(email, password, name = '') {
+    // Check if email domain is allowed
+    if (!isEmailDomainAllowed(email)) {
+      throw new ValidationError('Registration is restricted to @idegy.com email addresses only');
+    }
+
     // Check if user exists
     if (users.has(email)) {
       throw new ValidationError('Email already registered');
@@ -80,6 +98,11 @@ class AuthService {
    * Login user
    */
   async login(email, password) {
+    // Check if email domain is allowed
+    if (!isEmailDomainAllowed(email)) {
+      throw new AuthenticationError('Access restricted to @idegy.com email addresses only');
+    }
+
     const user = users.get(email);
 
     if (!user) {
