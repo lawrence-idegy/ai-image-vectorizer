@@ -1,125 +1,58 @@
 import { Icon } from '@iconify/react';
+import { useTheme } from '../../contexts/ThemeContext';
 
-function Header({
-  activeTab,
-  setActiveTab,
-  currentSVG,
-  showSidebar,
-  setShowSidebar,
-  showRightPanel,
-  setShowRightPanel,
-  setShowIconLibrary,
-  setShowHelp,
-  setShowAuth,
-  user,
-  onLogout,
-}) {
+function Header({ user, onLogout, onSignIn }) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
-    <header className="gradient-header shadow-sm z-20">
-      {/* Single row header */}
-      <div className="px-4 py-2 flex items-center justify-between">
-        {/* Logo + Tabs */}
-        <div className="flex items-center gap-6">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <Icon icon="mdi:vector-square" className="w-6 h-6" />
-            <span className="text-base font-semibold">idegy</span>
+    <header className="bg-white dark:bg-idegy-navy shadow-sm z-20 border-b border-gray-200 dark:border-idegy-navy-dark">
+      <div className="px-3 sm:px-4 py-3 flex items-center justify-between">
+        {/* Logo + Title */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="dark:bg-white dark:rounded dark:px-2 dark:py-1">
+            <img
+              src="/idegy_logo.png"
+              alt="idegy"
+              className="h-7 sm:h-8 w-auto"
+            />
           </div>
-
-          {/* Tab Navigation - inline */}
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={() => setActiveTab('upload')}
-              className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                activeTab === 'upload'
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Icon icon="mdi:upload" className="w-3.5 h-3.5 inline mr-1" />
-              Upload
-            </button>
-
-            <button
-              onClick={() => setActiveTab('editor')}
-              disabled={!currentSVG}
-              className={`px-3 py-1.5 text-xs font-medium rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-                activeTab === 'editor'
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Icon icon="mdi:draw" className="w-3.5 h-3.5 inline mr-1" />
-              Editor
-            </button>
-
-            <button
-              onClick={() => setActiveTab('batch')}
-              className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                activeTab === 'batch'
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Icon icon="mdi:image-multiple" className="w-3.5 h-3.5 inline mr-1" />
-              Batch
-            </button>
-          </div>
+          <span className="hidden xs:inline text-sm font-medium text-gray-500 dark:text-white/80">| Vector Fix</span>
         </div>
 
-        {/* Right side actions */}
-        <div className="flex items-center gap-1">
+        {/* User Actions */}
+        <div className="flex items-center gap-2">
+          {/* Theme Toggle */}
           <button
-            onClick={() => setShowIconLibrary(true)}
-            className="p-1.5 rounded hover:bg-white/10 transition-colors text-white/80 hover:text-white"
-            title="Icon Library"
+            onClick={toggleTheme}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors theme-toggle"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            <Icon icon="mdi:shape" className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setShowSidebar(!showSidebar)}
-            className={`p-1.5 rounded transition-colors ${showSidebar ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/80 hover:text-white'}`}
-            title="Toggle Sidebar"
-          >
-            <Icon icon="mdi:dock-left" className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setShowRightPanel(!showRightPanel)}
-            className={`p-1.5 rounded transition-colors ${showRightPanel ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/80 hover:text-white'}`}
-            title="Toggle Right Panel"
-          >
-            <Icon icon="mdi:dock-right" className="w-4 h-4" />
-          </button>
-
-          <div className="w-px h-4 bg-white/20 mx-1" />
-
-          <button
-            onClick={() => setShowHelp(true)}
-            className="p-1.5 rounded hover:bg-white/10 transition-colors text-white/80 hover:text-white"
-            title="Help"
-          >
-            <Icon icon="mdi:help-circle-outline" className="w-4 h-4" />
+            <Icon
+              icon={theme === 'dark' ? 'mdi:weather-sunny' : 'mdi:weather-night'}
+              className="w-5 h-5 text-gray-600 dark:text-white/90"
+            />
           </button>
 
           {user ? (
-            <div className="flex items-center gap-1 ml-1">
-              <span className="text-xs text-white/70 max-w-[100px] truncate">{user.name || user.email}</span>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="hidden sm:inline text-sm text-gray-600 dark:text-white/80 max-w-[150px] truncate">
+                {user.name || user.email}
+              </span>
               <button
                 onClick={onLogout}
-                className="p-1.5 rounded hover:bg-white/10 transition-colors text-white/80 hover:text-white"
-                title="Logout"
+                className="p-2 rounded hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-600 dark:text-white/80 hover:text-gray-900 dark:hover:text-white"
+                title="Sign out"
               >
-                <Icon icon="mdi:logout" className="w-4 h-4" />
+                <Icon icon="mdi:logout" className="w-5 h-5" />
               </button>
             </div>
           ) : (
             <button
-              onClick={() => setShowAuth(true)}
-              className="px-2.5 py-1 text-xs bg-white/15 hover:bg-white/25 rounded transition-colors font-medium ml-1"
+              onClick={onSignIn}
+              className="px-3 sm:px-4 py-2 text-sm bg-idegy-navy dark:bg-white hover:bg-idegy-navy-light dark:hover:bg-gray-100 text-white dark:text-idegy-navy rounded-lg transition-colors font-medium"
             >
-              Sign In
+              <span className="hidden sm:inline">Sign In</span>
+              <Icon icon="mdi:login" className="w-5 h-5 sm:hidden" />
             </button>
           )}
         </div>

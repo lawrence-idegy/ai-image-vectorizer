@@ -1,409 +1,237 @@
-import { useState, useRef } from 'react';
-import { Icon } from '@iconify/react';
-import * as fabric from 'fabric';
+import { useState } from 'react';
 
 // Layout Components
 import Header from './components/Layout/Header';
-import Sidebar from './components/Layout/Sidebar';
-import RightPanel from './components/Layout/RightPanel';
 
-// Feature Components
-import CanvasEditor from './components/Canvas/CanvasEditor';
-import BatchProcessor from './components/Batch/BatchProcessor';
-import IconLibrary from './components/Tools/IconLibrary';
-import BackgroundRemovalTool from './components/Tools/BackgroundRemovalTool';
+// Simple Flow Components
+import SimpleUpload from './components/SimpleUpload';
+import Processing from './components/Processing';
+import CleanupEditor from './components/CleanupEditor';
+import DownloadResults from './components/DownloadResults';
+
+// Auth Components
 import AuthModal from './components/Auth/AuthModal';
-import HelpModal from './components/Help/HelpModal';
 
 // Hooks
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 
-// API
-import { vectorizeImage } from './services/api';
+// Theme Context
+import { ThemeProvider } from './contexts/ThemeContext';
 
-// Utilities
-import { downloadFile, downloadSVGFile } from './utils/exportUtils';
+// API
+import { vectorizeImage, removeBackground } from './services/api';
 
 function AppContent() {
-  // State
-  const [activeTab, setActiveTab] = useState('upload');
-  const [loading, setLoading] = useState(false);
-  const [currentImage, setCurrentImage] = useState(null);
-  const [currentSVG, setCurrentSVG] = useState(null);
-  const [qualityMetrics, setQualityMetrics] = useState(null);
-  const [optimization, setOptimization] = useState(null);
+  // Flow state: 'upload' | 'processing' | 'cleanup' | 'complete'
+  const [step, setStep] = useState('upload');
+  const [error, setError] = useState(null);
+  const [processingStatus, setProcessingStatus] = useState('Processing...');
 
-  // UI State
-  const [showSidebar, setShowSidebar] = useState(true);
-  const [showRightPanel, setShowRightPanel] = useState(true);
-  const [showIconLibrary, setShowIconLibrary] = useState(false);
-  const [showBackgroundRemoval, setShowBackgroundRemoval] = useState(false);
+  // Data state
+  const [currentFile, setCurrentFile] = useState(null);
+  const [clientName, setClientName] = useState('');
+  const [projectName, setProjectName] = useState('');
+  const [svgContent, setSvgContent] = useState(null);
+
+  // Auth - require login before accessing app
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
 
-  // Canvas State
-  const [activeCanvasObject, setActiveCanvasObject] = useState(null);
-  const [canvasBackground, setCanvasBackground] = useState('#ffffff');
-  const canvasEditorRef = useRef(null);
+  // Show login modal if not authenticated (after loading check)
+  const needsAuth = !loading && !isAuthenticated;
 
-  // Auth
-  const { user, logout } = useAuth();
-
-  // Handlers
-  const handleFileSelect = (file) => {
-    setCurrentImage(file);
-  };
-
-  const handleVectorize = async (file, options) => {
-    if (options.removeBackground) {
-      setShowBackgroundRemoval(true);
+  const handleUpload = async ({ file, clientName: client, projectName: project, removeBackground: shouldRemoveBg }) => {
+    // Double-check authentication
+    if (!isAuthenticated) {
+      setShowAuth(true);
       return;
     }
-    await processVectorization(file, options);
-  };
 
-  const processVectorization = async (file, options) => {
-    setLoading(true);
+    setCurrentFile(file);
+    setClientName(client);
+    setProjectName(project);
+    setStep('processing');
+    setError(null);
+
     try {
-      const result = await vectorizeImage(file, {
-        ...options,
+      let processedFile = file;
+
+      // Step 1: Remove background if requested
+      if (shouldRemoveBg) {
+        setProcessingStatus('Removing background...');
+        try {
+          const bgResult = await removeBackground(file, { quality: 'balanced' });
+          if (bgResult.success && bgResult.image) {
+            // Convert data URI back to File
+            const response = await fetch(bgResult.image);
+            const blob = await response.blob();
+            processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '_nobg.png'), { type: 'image/png' });
+          }
+        } catch (bgErr) {
+          console.warn('Background removal failed, continuing with original:', bgErr.message);
+          // Continue with original file if background removal fails
+        }
+      }
+
+      // Step 2: Vectorize the image using AI
+      setProcessingStatus('Vectorizing with AI...');
+
+      const vectorOptions = {
+        method: 'ai',
         optimize: true,
-      });
+        detailLevel: 'high',
+      };
+
+      const result = await vectorizeImage(processedFile, vectorOptions);
 
       if (result.success) {
-        setCurrentSVG(result.svgContent);
-        setQualityMetrics(result.quality);
-        setOptimization(result.optimization);
-        setActiveTab('editor');
+        setSvgContent(result.svgContent);
+        setStep('cleanup'); // Go to cleanup step first
       } else {
-        alert('Vectorization failed: ' + result.message);
+        throw new Error(result.message || 'Vectorization failed');
       }
-    } catch (error) {
-      console.error('Error during vectorization:', error);
-      alert('An error occurred during vectorization. Please try again.');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Vectorization error:', err);
+      setError(err.message || 'An error occurred during vectorization');
+      setStep('upload');
     }
   };
 
-  const handleBackgroundRemovalComplete = async (processedFile) => {
-    setShowBackgroundRemoval(false);
-    setCurrentImage(processedFile);
-    await processVectorization(processedFile, { method: 'ai', detailLevel: 'high' });
+  const handleStartOver = () => {
+    setStep('upload');
+    setCurrentFile(null);
+    setClientName('');
+    setProjectName('');
+    setSvgContent(null);
+    setError(null);
+    setProcessingStatus('Processing...');
   };
 
-  const handleColorChange = (updatedSVG, oldColor, newColor, colorMap) => {
-    // Apply color changes directly to the canvas objects
-    // Do NOT update currentSVG state - that would trigger a full canvas reload
-    // and lose any user modifications (deletions, transforms, etc.)
-    if (canvasEditorRef.current) {
-      if (colorMap) {
-        // Multiple color replacement (palette theme)
-        canvasEditorRef.current.replaceMultipleColorsOnCanvas(colorMap);
-      } else if (oldColor && newColor) {
-        // Single color replacement
-        canvasEditorRef.current.replaceColorOnCanvas(oldColor, newColor);
-      }
-    }
+  const handleCleanupComplete = (cleanedSvg) => {
+    setSvgContent(cleanedSvg);
+    setStep('complete');
   };
 
-  const handleBackgroundChange = (color) => {
-    setCanvasBackground(color);
-    if (canvasEditorRef.current?.changeBackground) {
-      canvasEditorRef.current.changeBackground(color);
-    }
+  const handleCleanupBack = () => {
+    // Go back to upload to try again
+    handleStartOver();
   };
 
-  const handleQuickExport = async (format) => {
-    if (!canvasEditorRef.current) {
-      alert('No canvas available to export');
-      return;
-    }
+  // Show loading screen while checking authentication
+  if (loading) {
+    return (
+      <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+        <Header user={null} onLogout={() => {}} onSignIn={() => {}} />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-idegy-blue border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-    const canvasEditor = canvasEditorRef.current;
-    const fabricCanvas = canvasEditor.getCanvas?.();
-
-    try {
-      switch (format.toLowerCase()) {
-        case 'png': {
-          // Higher resolution PNG export
-          const png = canvasEditor.toDataURL({ format: 'png', quality: 1, multiplier: 2 });
-          downloadFile(png, 'canvas-export.png');
-          break;
-        }
-        case 'svg':
-          downloadSVGFile(canvasEditor.toSVG(), 'canvas-export.svg');
-          break;
-        case 'pdf':
-          await exportAsPDF(canvasEditor, fabricCanvas);
-          break;
-        case 'eps':
-          await exportAsEPS(canvasEditor, fabricCanvas);
-          break;
-        case 'ai':
-          await exportAsAI(canvasEditor, fabricCanvas);
-          break;
-      }
-    } catch (error) {
-      console.error(`Error exporting as ${format}:`, error);
-      alert(`Failed to export as ${format.toUpperCase()}. Please try again.`);
-    }
-  };
-
-  const exportAsPDF = async (canvasEditor, fabricCanvas, filename = 'canvas-export.pdf') => {
-    const { jsPDF } = await import('jspdf');
-    await import('svg2pdf.js');
-
-    const svgString = canvasEditor.toSVG();
-    const parser = new DOMParser();
-    const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
-    const svgElement = svgDoc.documentElement;
-
-    const width = fabricCanvas?.width || 800;
-    const height = fabricCanvas?.height || 600;
-
-    const pdf = new jsPDF({
-      orientation: width > height ? 'landscape' : 'portrait',
-      unit: 'px',
-      format: [width, height],
-    });
-
-    await pdf.svg(svgElement, { x: 0, y: 0, width, height });
-    pdf.save(filename);
-  };
-
-  const exportAsEPS = async (canvasEditor, fabricCanvas) => {
-    // EPS format is PostScript-based, but modern design apps can open PDF files
-    // We create a PDF that these apps can import and convert to EPS
-    const { jsPDF } = await import('jspdf');
-    await import('svg2pdf.js');
-
-    const svgString = canvasEditor.toSVG();
-    const parser = new DOMParser();
-    const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
-    const svgElement = svgDoc.documentElement;
-
-    const width = fabricCanvas?.width || 800;
-    const height = fabricCanvas?.height || 600;
-
-    const pdf = new jsPDF({
-      orientation: width > height ? 'landscape' : 'portrait',
-      unit: 'px',
-      format: [width, height],
-    });
-
-    pdf.setProperties({
-      title: 'Canvas Export',
-      creator: 'idegy Vectorizer',
-      subject: 'Vector Graphics - Open in Illustrator and Save As EPS',
-    });
-
-    await pdf.svg(svgElement, { x: 0, y: 0, width, height });
-    pdf.save('canvas-export.eps');
-  };
-
-  const exportAsAI = async (canvasEditor, fabricCanvas) => {
-    // Adobe Illustrator .ai format is proprietary PDF-based
-    // We create a PDF with AI-compatible metadata that Illustrator opens natively
-    const { jsPDF } = await import('jspdf');
-    await import('svg2pdf.js');
-
-    const svgString = canvasEditor.toSVG();
-    const parser = new DOMParser();
-    const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
-    const svgElement = svgDoc.documentElement;
-
-    const width = fabricCanvas?.width || 800;
-    const height = fabricCanvas?.height || 600;
-
-    const pdf = new jsPDF({
-      orientation: width > height ? 'landscape' : 'portrait',
-      unit: 'px',
-      format: [width, height],
-    });
-
-    pdf.setProperties({
-      title: 'Canvas Export',
-      creator: 'idegy Vectorizer',
-      subject: 'Vector Graphics',
-    });
-
-    await pdf.svg(svgElement, { x: 0, y: 0, width, height });
-    pdf.save('canvas-export.ai');
-  };
-
-  const handleIconSelect = (iconName) => {
-    if (!canvasEditorRef.current) return;
-
-    const canvas = canvasEditorRef.current;
-    const text = new fabric.Text(iconName, {
-      left: canvas.width / 2 - 50,
-      top: canvas.height / 2 - 20,
-      fontSize: 14,
-      fill: '#666666',
-      fontFamily: 'Arial',
-    });
-
-    canvas.add(text);
-    canvas.renderAll();
-    setShowIconLibrary(false);
-  };
+  // Show login screen if not authenticated
+  if (needsAuth) {
+    return (
+      <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+        <Header user={null} onLogout={() => {}} onSignIn={() => {}} />
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-y-auto">
+          <div className="w-full max-w-md animate-fade-in">
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Welcome to Vector Fix</h1>
+              <p className="text-gray-500 dark:text-gray-400">Sign in to start converting images to vectors</p>
+            </div>
+            <AuthModal
+              isOpen={true}
+              onClose={() => {}}
+              embedded={true}
+            />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        currentSVG={currentSVG}
-        showSidebar={showSidebar}
-        setShowSidebar={setShowSidebar}
-        showRightPanel={showRightPanel}
-        setShowRightPanel={setShowRightPanel}
-        setShowIconLibrary={setShowIconLibrary}
-        setShowHelp={setShowHelp}
-        setShowAuth={setShowAuth}
         user={user}
         onLogout={logout}
+        onSignIn={() => setShowAuth(true)}
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        {showSidebar && (
-          <Sidebar
-            activeTab={activeTab}
-            currentSVG={currentSVG}
-            qualityMetrics={qualityMetrics}
-            onFileSelect={handleFileSelect}
-            onVectorize={handleVectorize}
-            loading={loading}
-            setShowIconLibrary={setShowIconLibrary}
-            canvasEditorRef={canvasEditorRef}
-            activeCanvasObject={activeCanvasObject}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Error Banner */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800 px-4 py-3">
+            <div className="max-w-xl mx-auto flex items-center gap-2 text-red-700 dark:text-red-400">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <span>{error}</span>
+              <button
+                onClick={() => setError(null)}
+                className="ml-auto text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step Content */}
+        {step === 'upload' && (
+          <SimpleUpload
+            onUpload={handleUpload}
+            disabled={false}
           />
         )}
 
-        {/* Main Canvas Area */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Welcome Screen */}
-          {activeTab === 'upload' && !currentImage && (
-            <WelcomeScreen />
-          )}
-
-          {/* Canvas Editor */}
-          {activeTab === 'editor' && currentSVG && (
-            <CanvasEditor
-              ref={canvasEditorRef}
-              svgContent={currentSVG}
-              image={currentImage}
-              onExport={() => {}}
-              onSelectionChange={setActiveCanvasObject}
-              className="flex-1"
-            />
-          )}
-
-          {/* Batch Processor */}
-          {activeTab === 'batch' && (
-            <BatchProcessor />
-          )}
-        </main>
-
-        {/* Right Panel */}
-        {showRightPanel && activeTab !== 'batch' && (
-          <RightPanel
-            currentSVG={currentSVG}
-            onColorChange={handleColorChange}
-            onQuickExport={handleQuickExport}
-            optimization={optimization}
-            canvasEditorRef={canvasEditorRef}
-            canvasBackground={canvasBackground}
-            onBackgroundChange={handleBackgroundChange}
+        {step === 'processing' && (
+          <Processing
+            filename={currentFile?.name}
+            status={processingStatus}
           />
         )}
-      </div>
 
-      {/* Modals */}
-      <IconLibrary
-        isOpen={showIconLibrary}
-        onClose={() => setShowIconLibrary(false)}
-        onIconSelect={handleIconSelect}
-      />
+        {step === 'cleanup' && svgContent && (
+          <CleanupEditor
+            svgContent={svgContent}
+            onComplete={handleCleanupComplete}
+            onBack={handleCleanupBack}
+          />
+        )}
 
-      {showBackgroundRemoval && currentImage && (
-        <BackgroundRemovalTool
-          image={currentImage}
-          onComplete={handleBackgroundRemovalComplete}
-          onCancel={() => setShowBackgroundRemoval(false)}
-        />
-      )}
+        {step === 'complete' && svgContent && (
+          <DownloadResults
+            svgContent={svgContent}
+            clientName={clientName}
+            projectName={projectName}
+            onStartOver={handleStartOver}
+          />
+        )}
+      </main>
 
+      {/* Auth Modal - for re-login if needed */}
       <AuthModal
         isOpen={showAuth}
         onClose={() => setShowAuth(false)}
       />
-
-      <HelpModal
-        isOpen={showHelp}
-        onClose={() => setShowHelp(false)}
-      />
-    </div>
-  );
-}
-
-function WelcomeScreen() {
-  return (
-    <div className="flex-1 flex items-center justify-center p-8">
-      <div className="text-center max-w-lg">
-        <Icon icon="mdi:vector-triangle" className="w-24 h-24 mx-auto mb-6 text-gray-300" />
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">
-          Welcome to idegy Vectorizer
-        </h2>
-        <p className="text-lg text-gray-600 mb-8">
-          Transform your raster images into crisp, scalable vectors with AI-powered precision.
-          Edit colors, add creative elements, and export to any format.
-        </p>
-        <div className="grid grid-cols-3 gap-4 text-left">
-          <FeatureCard
-            icon="mdi:palette"
-            title="Color Editing"
-            description="Extract and edit color palettes"
-            color="text-idegy-blue"
-          />
-          <FeatureCard
-            icon="mdi:layers"
-            title="Canvas Editor"
-            description="Add shapes, text & icons"
-            color="text-idegy-teal"
-          />
-          <FeatureCard
-            icon="mdi:download"
-            title="Multi-format Export"
-            description="SVG, PDF, EPS, AI formats"
-            color="text-idegy-darkblue"
-          />
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-function FeatureCard({ icon, title, description, color }) {
-  return (
-    <div className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
-      <Icon icon={icon} className={`w-8 h-8 ${color} mb-2`} />
-      <h3 className="font-semibold mb-1 text-sm">{title}</h3>
-      <p className="text-xs text-gray-600">{description}</p>
     </div>
   );
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

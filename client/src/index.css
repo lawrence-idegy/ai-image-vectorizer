@@ -2,18 +2,36 @@
 
 @import "tailwindcss";
 
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-idegy-blue: #0076CE;
-  --color-idegy-teal: #00B2A9;
-  --color-idegy-darkblue: #003D5C;
-  --color-idegy-lightblue: #E6F4F8;
+  --color-idegy-navy: #0D2240;
+  --color-idegy-red: #E63329;
+  --color-idegy-navy-light: #1A3A5C;
+  --color-idegy-navy-dark: #081828;
+  --color-idegy-red-light: #FF4D42;
+  --color-idegy-red-dark: #C42A21;
   --color-idegy-gray: #F5F7FA;
+  --color-idegy-blue: #4A9FE5;
+  --color-idegy-teal: #38BDF8;
+}
+
+/* Smooth theme transitions */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 @layer base {
   * {
     border-color: rgb(229 231 235);
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   }
+
+  .dark * {
+    border-color: rgb(55 65 81);
+  }
+
   body {
     background-color: rgb(249 250 251);
     color: rgb(17 24 39);
@@ -22,22 +40,60 @@
     margin: 0;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
+
+  .dark body {
+    background-color: rgb(17 24 39);
+    color: rgb(243 244 246);
+  }
 }
 
 @layer components {
+  /* SVG Preview centering */
+  .preview-svg-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  .preview-svg-container svg {
+    max-width: 100%;
+    max-height: 400px;
+    width: auto;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+
   .btn-primary {
-    background-color: var(--color-idegy-blue);
+    background-color: var(--color-idegy-navy);
     color: white;
     font-weight: 500;
     padding: 0.625rem 1.5rem;
     border-radius: 0.5rem;
     transition: all 0.2s;
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 4px 6px -1px rgb(13 34 64 / 0.25);
+  }
+
+  .dark .btn-primary {
+    background-color: white;
+    color: var(--color-idegy-navy);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.1), 0 4px 6px -1px rgb(0 0 0 / 0.15);
   }
 
   .btn-primary:hover {
-    background-color: var(--color-idegy-darkblue);
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    background-color: var(--color-idegy-navy-light);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1), 0 8px 16px -4px rgb(13 34 64 / 0.35);
+    transform: translateY(-1px);
+  }
+
+  .dark .btn-primary:hover {
+    background-color: rgb(243 244 246);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0) scale(0.98);
   }
 
   .btn-secondary {
@@ -52,13 +108,34 @@
 
   .btn-secondary:hover {
     background-color: rgb(249 250 251);
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .dark .btn-secondary {
+    background-color: rgb(31 41 55);
+    color: rgb(229 231 235);
+    border-color: rgb(75 85 99);
+  }
+
+  .dark .btn-secondary:hover {
+    background-color: rgb(55 65 81);
   }
 
   .panel {
     background-color: white;
     border: 1px solid rgb(229 231 235);
     border-radius: 0.75rem;
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  }
+
+  .dark .panel {
+    background-color: rgb(31 41 55);
+    border-color: rgb(55 65 81);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.2);
   }
 
   .input-field {
@@ -66,23 +143,119 @@
     padding: 0.625rem 1rem;
     border: 1px solid rgb(209 213 219);
     border-radius: 0.5rem;
-    transition: all;
+    transition: all 0.2s;
     outline: none;
+    background-color: white;
+    color: rgb(17 24 39);
   }
 
   .input-field:focus {
     ring: 2px;
     ring-color: var(--color-idegy-blue);
     border-color: var(--color-idegy-blue);
+    box-shadow: 0 0 0 3px rgb(0 118 206 / 0.1);
+  }
+
+  .dark .input-field {
+    background-color: rgb(31 41 55);
+    border-color: rgb(75 85 99);
+    color: rgb(243 244 246);
+  }
+
+  .dark .input-field:focus {
+    border-color: var(--color-idegy-blue);
+    box-shadow: 0 0 0 3px rgb(0 118 206 / 0.2);
   }
 
   .gradient-header {
-    background-image: linear-gradient(to right, var(--color-idegy-blue), var(--color-idegy-teal));
+    background-color: var(--color-idegy-navy);
     color: white;
   }
 
   /* Color picker fix - ensure it fits in container */
   .color-picker-wrapper .react-colorful {
     width: 100% !important;
+  }
+
+  /* Card hover lift animation */
+  .card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .card-hover:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Fade-in animation */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Success bounce animation */
+  .animate-success {
+    animation: successBounce 0.5s ease-out;
+  }
+
+  @keyframes successBounce {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  /* Scale animation for upload zone */
+  .upload-zone-hover {
+    transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .upload-zone-hover:hover {
+    transform: scale(1.01);
+  }
+
+  /* Theme toggle button animation */
+  .theme-toggle {
+    transition: transform 0.3s ease;
+  }
+
+  .theme-toggle:hover {
+    transform: rotate(15deg);
+  }
+
+  /* Spinner refined animation */
+  .spinner-ring {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+@layer utilities {
+  /* Dark mode shadow utilities */
+  .shadow-dark {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
+  }
+
+  .shadow-dark-lg {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
   }
 }
