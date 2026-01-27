@@ -131,17 +131,6 @@ function AuthModal({ isOpen, onClose, embedded = false }) {
         </button>
       </form>
 
-      <div className="mt-6 text-center text-sm">
-        <span className="text-gray-600 dark:text-gray-400">
-          {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-        </span>
-        <button
-          onClick={switchMode}
-          className="text-idegy-blue hover:underline font-medium"
-        >
-          {mode === 'login' ? 'Sign up' : 'Sign in'}
-        </button>
-      </div>
 
     </>
   );
