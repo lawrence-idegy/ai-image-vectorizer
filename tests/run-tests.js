@@ -129,11 +129,11 @@ class TestRunner {
     // Define test cases
     const testCases = [
       // Test if test images exist
-      { file: 'simple-logo.png', edgeCase: 'simple-logo', methods: ['ai', 'potrace'] },
+      { file: 'simple-logo.png', edgeCase: 'simple-logo', methods: ['ai'] },
       { file: 'complex-illustration.png', edgeCase: 'complex-illustration', methods: ['ai'] },
-      { file: 'line-art.png', edgeCase: 'line-art', methods: ['ai', 'potrace'] },
-      { file: 'icon.png', edgeCase: 'icon', methods: ['ai', 'potrace'] },
-      { file: 'high-contrast.png', edgeCase: 'high-contrast', methods: ['ai', 'potrace'] },
+      { file: 'line-art.png', edgeCase: 'line-art', methods: ['ai'] },
+      { file: 'icon.png', edgeCase: 'icon', methods: ['ai'] },
+      { file: 'high-contrast.png', edgeCase: 'high-contrast', methods: ['ai'] },
     ];
 
     // Check which test images exist
@@ -195,11 +195,6 @@ class TestRunner {
     console.log(`   Total: ${report.byMethod.ai.total}`);
     console.log(`   Passed: ${report.byMethod.ai.passed} ✅`);
     console.log(`   Failed: ${report.byMethod.ai.failed} ❌`);
-
-    console.log(`\n🔧 Potrace Fallback:`);
-    console.log(`   Total: ${report.byMethod.potrace.total}`);
-    console.log(`   Passed: ${report.byMethod.potrace.passed} ✅`);
-    console.log(`   Failed: ${report.byMethod.potrace.failed} ❌`);
 
     if (report.recommendations.length > 0) {
       console.log(`\n💡 Recommendations:`);

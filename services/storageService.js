@@ -29,15 +29,25 @@ class StorageService {
       apiSecret: process.env.CLOUDINARY_API_SECRET,
     };
 
-    this.ensureDirectories();
+    // Skip directory creation on serverless platforms (read-only filesystem)
+    if (!process.env.VERCEL) {
+      this.ensureDirectories();
+    }
   }
 
   async ensureDirectories() {
+    // Skip on serverless platforms
+    if (process.env.VERCEL) {
+      return;
+    }
     try {
       await fs.mkdir(this.uploadDir, { recursive: true });
       await fs.mkdir(this.outputDir, { recursive: true });
     } catch (error) {
-      console.error('Error creating storage directories:', error);
+      // Ignore errors on serverless platforms
+      if (!process.env.VERCEL) {
+        console.error('Error creating storage directories:', error);
+      }
     }
   }
 

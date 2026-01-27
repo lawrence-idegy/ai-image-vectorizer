@@ -1,16 +1,17 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
-const cacheService = require('./cacheService');
 const { AuthenticationError, AuthorizationError, ValidationError } = require('../utils/errors');
-
-// In-memory user store (replace with database in production)
-const users = new Map();
 
 // JWT configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'idegy-vectorizer-secret-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
+
+// Environment-based credentials (works on serverless)
+// Format: DEMO_USER_EMAIL, DEMO_USER_PASSWORD, or use defaults
+const DEMO_EMAIL = process.env.DEMO_USER_EMAIL || 'demo@idegy.com';
+const DEMO_PASSWORD = process.env.DEMO_USER_PASSWORD || 'demo123';
 
 // Allowed email domains (set via env or default to @idegy.com)
 const ALLOWED_EMAIL_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || 'idegy.com').split(',').map(d => d.trim().toLowerCase());
@@ -25,34 +26,33 @@ const isEmailDomainAllowed = (email) => {
   return ALLOWED_EMAIL_DOMAINS.includes(domain);
 };
 
+/**
+ * Get user from environment-based credentials
+ * This works on serverless because it reads from env vars on each request
+ */
+const getEnvUser = (email) => {
+  if (email.toLowerCase() === DEMO_EMAIL.toLowerCase()) {
+    return {
+      id: 'demo-user-id',
+      email: DEMO_EMAIL,
+      password: DEMO_PASSWORD, // Plain text comparison for env-based auth
+      name: 'Demo User',
+      role: 'user',
+      plan: 'pro',
+      createdAt: '2024-01-01T00:00:00.000Z',
+    };
+  }
+  return null;
+};
+
 class AuthService {
   constructor() {
-    // Create a demo user for testing
-    this.createDemoUser();
-  }
-
-  async createDemoUser() {
-    const demoEmail = 'demo@idegy.com';
-    if (!users.has(demoEmail)) {
-      const hashedPassword = await bcrypt.hash('demo123', 10);
-      users.set(demoEmail, {
-        id: uuidv4(),
-        email: demoEmail,
-        password: hashedPassword,
-        name: 'Demo User',
-        role: 'user',
-        plan: 'free',
-        createdAt: new Date().toISOString(),
-        usage: {
-          vectorizations: 0,
-          lastReset: new Date().toISOString(),
-        },
-      });
-    }
+    console.log(`Auth service initialized. Demo login: ${DEMO_EMAIL}`);
   }
 
   /**
    * Register a new user
+   * Note: In env-based auth, registration creates a session but doesn't persist
    */
   async register(email, password, name = '') {
     // Check if email domain is allowed
@@ -60,30 +60,20 @@ class AuthService {
       throw new ValidationError('Registration is restricted to @idegy.com email addresses only');
     }
 
-    // Check if user exists
-    if (users.has(email)) {
-      throw new ValidationError('Email already registered');
+    // For env-based auth, just check if it matches demo credentials
+    if (email.toLowerCase() === DEMO_EMAIL.toLowerCase()) {
+      throw new ValidationError('This email is already registered. Please login instead.');
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Create user
+    // Create a temporary user session (won't persist across serverless invocations)
     const user = {
       id: uuidv4(),
       email,
-      password: hashedPassword,
       name,
       role: 'user',
       plan: 'free',
       createdAt: new Date().toISOString(),
-      usage: {
-        vectorizations: 0,
-        lastReset: new Date().toISOString(),
-      },
     };
-
-    users.set(email, user);
 
     // Generate tokens
     const tokens = this.generateTokens(user);
@@ -95,7 +85,7 @@ class AuthService {
   }
 
   /**
-   * Login user
+   * Login user - validates against environment credentials
    */
   async login(email, password) {
     // Check if email domain is allowed
@@ -103,16 +93,15 @@ class AuthService {
       throw new AuthenticationError('Access restricted to @idegy.com email addresses only');
     }
 
-    const user = users.get(email);
+    // Get user from environment-based credentials
+    const user = getEnvUser(email);
 
     if (!user) {
       throw new AuthenticationError('Invalid email or password');
     }
 
-    // Check password
-    const isValid = await bcrypt.compare(password, user.password);
-
-    if (!isValid) {
+    // Direct password comparison for env-based auth
+    if (password !== user.password) {
       throw new AuthenticationError('Invalid email or password');
     }
 
@@ -132,7 +121,8 @@ class AuthService {
     try {
       const decoded = jwt.verify(refreshToken, JWT_SECRET);
 
-      const user = users.get(decoded.email);
+      // Get user from env-based credentials
+      const user = getEnvUser(decoded.email);
 
       if (!user) {
         throw new AuthenticationError('User not found');
@@ -196,10 +186,10 @@ class AuthService {
    * Get user by ID
    */
   getUserById(userId) {
-    for (const user of users.values()) {
-      if (user.id === userId) {
-        return this.sanitizeUser(user);
-      }
+    // For env-based auth, check if it's the demo user
+    if (userId === 'demo-user-id') {
+      const user = getEnvUser(DEMO_EMAIL);
+      return user ? this.sanitizeUser(user) : null;
     }
     return null;
   }
@@ -208,82 +198,47 @@ class AuthService {
    * Get user by email
    */
   getUserByEmail(email) {
-    const user = users.get(email);
+    const user = getEnvUser(email);
     return user ? this.sanitizeUser(user) : null;
   }
 
   /**
-   * Update user profile
+   * Update user profile (limited in env-based auth)
    */
   async updateProfile(userId, updates) {
-    for (const [email, user] of users.entries()) {
-      if (user.id === userId) {
-        // Update allowed fields
-        if (updates.name) user.name = updates.name;
-        if (updates.email && updates.email !== email) {
-          // Check if new email is taken
-          if (users.has(updates.email)) {
-            throw new ValidationError('Email already in use');
-          }
-          user.email = updates.email;
-          users.delete(email);
-          users.set(updates.email, user);
-        }
-
-        return this.sanitizeUser(user);
-      }
+    // In env-based auth, profile updates are not persisted
+    const user = this.getUserById(userId);
+    if (!user) {
+      throw new AuthenticationError('User not found');
     }
-    throw new AuthenticationError('User not found');
+    // Return user with requested updates (not persisted)
+    return { ...user, ...updates };
   }
 
   /**
-   * Change password
+   * Change password (not supported in env-based auth)
    */
   async changePassword(userId, currentPassword, newPassword) {
-    for (const user of users.values()) {
-      if (user.id === userId) {
-        const isValid = await bcrypt.compare(currentPassword, user.password);
-
-        if (!isValid) {
-          throw new AuthenticationError('Current password is incorrect');
-        }
-
-        user.password = await bcrypt.hash(newPassword, 12);
-        return true;
-      }
-    }
-    throw new AuthenticationError('User not found');
+    throw new ValidationError('Password changes are not supported. Contact administrator.');
   }
 
   /**
-   * Track usage
+   * Track usage (no-op in env-based auth)
    */
   trackUsage(userId, operation = 'vectorization') {
-    for (const user of users.values()) {
-      if (user.id === userId) {
-        user.usage.vectorizations++;
-        return user.usage;
-      }
-    }
-    return null;
+    return { vectorizations: 0, lastReset: new Date().toISOString() };
   }
 
   /**
-   * Check usage limits
+   * Check usage limits (unlimited in env-based auth)
    */
   checkUsageLimits(userId) {
-    for (const user of users.values()) {
-      if (user.id === userId) {
-        const limits = this.getPlanLimits(user.plan);
-        return {
-          current: user.usage.vectorizations,
-          limit: limits.vectorizations,
-          remaining: Math.max(0, limits.vectorizations - user.usage.vectorizations),
-          canProcess: user.usage.vectorizations < limits.vectorizations,
-        };
-      }
-    }
-    return null;
+    return {
+      current: 0,
+      limit: Infinity,
+      remaining: Infinity,
+      canProcess: true,
+    };
   }
 
   /**

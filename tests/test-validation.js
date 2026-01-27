@@ -2,9 +2,8 @@
  * Test Validation Suite for idegy AI Image Vectorizer
  *
  * This suite validates:
- * 1. Potrace (fallback) functionality
- * 2. AI vectorization quality
- * 3. Edge cases and accuracy
+ * 1. AI vectorization quality
+ * 2. Edge cases and accuracy
  */
 
 const fs = require('fs').promises;
@@ -197,7 +196,7 @@ class VectorizerTester {
    * Run comprehensive test on SVG output
    * @param {string} svgContent - SVG content
    * @param {string} testName - Name of test
-   * @param {string} method - 'ai' or 'potrace'
+   * @param {string} method - 'ai'
    * @param {string} edgeCase - Type of edge case
    * @returns {object} Test results
    */
@@ -272,11 +271,6 @@ class VectorizerTester {
           total: 0,
           passed: 0,
           failed: 0
-        },
-        potrace: {
-          total: 0,
-          passed: 0,
-          failed: 0
         }
       },
       tests: this.testResults,
@@ -296,10 +290,6 @@ class VectorizerTester {
     // Add recommendations
     if (report.byMethod.ai.failed > report.byMethod.ai.passed) {
       report.recommendations.push('AI vectorization has high failure rate - check API configuration');
-    }
-
-    if (report.byMethod.potrace.failed > report.byMethod.potrace.passed) {
-      report.recommendations.push('Potrace fallback needs tuning - consider adjusting threshold parameters');
     }
 
     return report;

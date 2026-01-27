@@ -236,30 +236,18 @@ class QualityValidator {
 
   /**
    * Get method-specific recommendations
-   * @param {string} method - 'ai' or 'potrace'
+   * @param {string} method - 'ai' or 'replicate'
    * @param {object} metrics - SVG metrics
    * @returns {array} Recommendations
    */
   getMethodRecommendations(method, metrics) {
     const recommendations = [];
 
-    if (method === 'potrace' || method === 'fallback') {
-      if (metrics.colorCount > 1) {
-        recommendations.push('⚠ Potrace may not preserve colors - consider using AI method');
-      }
-      if (metrics.complexity === 'complex' || metrics.complexity === 'very complex') {
-        recommendations.push('⚠ Complex images work better with AI vectorization');
-      }
-      recommendations.push('ℹ Potrace is best for simple black & white graphics');
+    if (metrics.quality === 'excellent') {
+      recommendations.push('✓ Excellent quality - ready for production use');
     }
-
-    if (method === 'ai' || method === 'replicate') {
-      if (metrics.quality === 'excellent') {
-        recommendations.push('✓ Excellent quality - ready for production use');
-      }
-      if (metrics.fileSize > 500 * 1024) {
-        recommendations.push('Consider optimizing SVG for web use');
-      }
+    if (metrics.fileSize > 500 * 1024) {
+      recommendations.push('Consider optimizing SVG for web use');
     }
 
     return recommendations;

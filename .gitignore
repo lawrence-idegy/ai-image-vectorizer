@@ -7,6 +7,8 @@ client/node_modules/
 .env.local
 .env.*.local
 .env.production
+client/.env
+client/.env.*
 
 # Build outputs
 client/dist/
@@ -39,3 +41,5 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+
+.vercel

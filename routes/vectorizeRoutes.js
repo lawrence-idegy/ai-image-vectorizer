@@ -4,7 +4,6 @@ const fs = require('fs').promises;
 const path = require('path');
 const sharp = require('sharp');
 const replicateService = require('../services/replicateService');
-const potraceService = require('../services/potraceService');
 const qualityValidator = require('../services/qualityValidator');
 const backgroundRemovalService = require('../services/backgroundRemovalService');
 const svgOptimizer = require('../services/svgOptimizer');
@@ -42,6 +41,7 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
         detailLevel = 'medium',
         optimize = 'true',
         optimizeLevel = 'default',
+        invert = 'false',
         ...options
       } = req.body;
 
@@ -123,31 +123,10 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
         .png({ quality: 100 })
         .toBuffer();
 
-      if (method === 'ai' || method === 'replicate') {
-        try {
-          const dataUri = replicateService.bufferToDataUri(imageBuffer, mimeType);
-          svgContent = await replicateService.vectorizeImage(dataUri, options);
-          processingMethod = 'Replicate AI (recraft-vectorize)';
-        } catch (aiError) {
-          console.warn('AI vectorization failed, falling back to Potrace:', aiError.message);
-          svgContent = await potraceService.vectorizeImage(imageBuffer, { detailLevel, ...options });
-          processingMethod = 'Potrace (fallback from AI error)';
-        }
-      } else if (method === 'potrace' || method === 'fallback') {
-        svgContent = await potraceService.vectorizeImage(imageBuffer, { detailLevel, ...options });
-        processingMethod = 'Potrace (local)';
-      } else {
-        // Default to AI with Potrace fallback
-        try {
-          const dataUri = replicateService.bufferToDataUri(imageBuffer, mimeType);
-          svgContent = await replicateService.vectorizeImage(dataUri, options);
-          processingMethod = 'Replicate AI (recraft-vectorize)';
-        } catch (aiError) {
-          console.warn('AI vectorization failed, falling back to Potrace:', aiError.message);
-          svgContent = await potraceService.vectorizeImage(imageBuffer, { detailLevel, ...options });
-          processingMethod = 'Potrace (fallback)';
-        }
-      }
+      // Vectorize using Replicate AI
+      const dataUri = replicateService.bufferToDataUri(imageBuffer, mimeType);
+      svgContent = await replicateService.vectorizeImage(dataUri, options);
+      processingMethod = 'Replicate AI (recraft-vectorize)';
 
       // Handle URL responses from Replicate
       let svgToSave = svgContent;
@@ -294,7 +273,7 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
       message: 'Batch processing started',
       jobId,
       totalFiles: req.files.length,
-      method: method === 'ai' ? 'Replicate AI' : 'Potrace',
+      method: 'Replicate AI',
     });
 
     // Process in background
@@ -345,18 +324,9 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
 
         let svgContent;
 
-        if (method === 'ai' || method === 'replicate') {
-          try {
-            const dataUri = replicateService.bufferToDataUri(imageBuffer, mimeType);
-            svgContent = await replicateService.vectorizeImage(dataUri, options);
-          } catch (aiError) {
-            // Fallback to Potrace if AI fails
-            console.warn(`AI vectorization failed for ${file.originalname}, falling back to Potrace:`, aiError.message);
-            svgContent = await potraceService.vectorizeImage(imageBuffer, options);
-          }
-        } else {
-          svgContent = await potraceService.vectorizeImage(imageBuffer, options);
-        }
+        // Vectorize using Replicate AI
+        const dataUri = replicateService.bufferToDataUri(imageBuffer, mimeType);
+        svgContent = await replicateService.vectorizeImage(dataUri, options);
 
         // Handle URL responses
         if (typeof svgContent === 'string' && svgContent.startsWith('http')) {
@@ -578,7 +548,6 @@ router.get('/methods', asyncHandler(async (req, res) => {
   }
 
   const replicateHealthy = await replicateService.checkHealth();
-  const potraceInfo = potraceService.getInfo();
 
   const result = {
     methods: [
@@ -595,13 +564,6 @@ router.get('/methods', asyncHandler(async (req, res) => {
           'Best for logos, illustrations, and complex graphics',
           'Compatible with Adobe Illustrator, Figma, Sketch',
         ],
-      },
-      {
-        id: 'potrace',
-        name: 'Potrace',
-        ...potraceInfo,
-        available: true,
-        recommended: false,
       },
     ],
     features: {

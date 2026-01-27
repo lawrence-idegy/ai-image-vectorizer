@@ -30,11 +30,13 @@ const authRoutes = require('./routes/authRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Create HTTP server for WebSocket support
+// Create HTTP server for WebSocket support (not used on Vercel)
 const server = http.createServer(app);
 
-// Initialize WebSocket
-websocketService.initialize(server);
+// Initialize WebSocket (skip on Vercel - serverless doesn't support WebSockets)
+if (!process.env.VERCEL) {
+  websocketService.initialize(server);
+}
 
 // Trust proxy (for rate limiting behind reverse proxy)
 app.set('trust proxy', 1);
@@ -53,13 +55,10 @@ app.use(sanitizeRequest);
 app.use(preventParamPollution);
 app.use(requestLogger);
 
-// Serve static files from client build (prioritize over public folder)
+// Serve static files from client build
 const clientDistPath = path.join(__dirname, 'client/dist');
 if (require('fs').existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));
-} else {
-  // Fallback to public folder only if client/dist doesn't exist
-  app.use(express.static('public'));
 }
 
 // Rate limiting
@@ -211,7 +210,7 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-// Start server
+// Start server (only when not running on Vercel serverless)
 const startServer = async () => {
   try {
     // Ensure directories exist
@@ -247,6 +246,12 @@ const startServer = async () => {
   }
 };
 
-startServer();
+// Only start server when not running on Vercel serverless
+if (!process.env.VERCEL) {
+  startServer();
+}
 
-module.exports = { app, server };
+// Export for Vercel serverless (needs default export of app)
+module.exports = app;
+module.exports.app = app;
+module.exports.server = server;

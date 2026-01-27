@@ -48,8 +48,10 @@ const logger = winston.createLogger({
   ],
 });
 
-// Add file transports in production
-if (process.env.NODE_ENV === 'production') {
+// Add file transports in production (skip on serverless platforms like Vercel)
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY;
+
+if (process.env.NODE_ENV === 'production' && !isServerless) {
   logger.add(new winston.transports.File({
     filename: path.join(__dirname, '../logs/error.log'),
     level: 'error',

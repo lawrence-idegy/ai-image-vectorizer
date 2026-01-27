@@ -4,13 +4,13 @@ const { StatusCodes } = require('http-status-codes');
 // Validation schemas
 const schemas = {
   vectorize: z.object({
-    method: z.enum(['ai', 'replicate', 'potrace', 'fallback', 'auto']).default('ai'),
+    method: z.enum(['ai', 'replicate']).default('ai'),
     removeBackground: z.enum(['true', 'false']).default('false'),
     detailLevel: z.enum(['low', 'medium', 'high']).default('medium'),
   }),
 
   batchVectorize: z.object({
-    method: z.enum(['ai', 'replicate', 'potrace', 'fallback', 'auto']).default('ai'),
+    method: z.enum(['ai', 'replicate']).default('ai'),
     detailLevel: z.enum(['low', 'medium', 'high']).default('medium'),
   }),
 

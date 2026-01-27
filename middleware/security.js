@@ -35,6 +35,15 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'http://localhost:5176',
+      'http://localhost:5177',
+      'http://localhost:5178',
+      'http://localhost:5179',
+      'http://localhost:5180',
+      'http://localhost:5181',
+      'http://localhost:5182',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:5173',
       process.env.FRONTEND_URL,
@@ -44,8 +53,11 @@ const corsOptions = {
     // Allow Railway domains (production deployment)
     const isRailwayDomain = origin.endsWith('.railway.app') || origin.endsWith('.up.railway.app');
 
-    // Allow if in allowed list, is a Railway domain, or in development mode
-    if (allowedOrigins.includes(origin) || isRailwayDomain || process.env.NODE_ENV === 'development') {
+    // Allow Vercel domains (production deployment)
+    const isVercelDomain = origin.endsWith('.vercel.app') || origin.endsWith('.vercel.sh');
+
+    // Allow if in allowed list, is a production domain, or in development mode
+    if (allowedOrigins.includes(origin) || isRailwayDomain || isVercelDomain || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
