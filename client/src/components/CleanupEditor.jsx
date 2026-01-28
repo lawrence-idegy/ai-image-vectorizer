@@ -100,6 +100,13 @@ function CleanupEditor({ svgContent, onComplete, onBack }) {
   const [currentOpacity, setCurrentOpacity] = useState(1); // For the slider
   const [showSidebar, setShowSidebar] = useState(false); // Mobile sidebar toggle
 
+  // Marquee drag-to-select state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState(null); // { x, y } in container coords
+  const [dragEnd, setDragEnd] = useState(null);
+  const dragThreshold = 5; // px movement before it counts as a drag vs click
+  const canvasAreaRef = useRef(null);
+
   // Preset colors for quick selection
   const presetColors = [
     { name: 'No Fill (transparent)', value: 'transparent' },
@@ -193,6 +200,123 @@ function CleanupEditor({ svgContent, onComplete, onBack }) {
 
     setSelectedElements(allOverlapping);
   };
+
+  // --- Marquee drag-to-select logic ---
+  const handleCanvasMouseDown = (e) => {
+    // Only respond to left mouse button on the canvas background or SVG elements
+    if (e.button !== 0) return;
+    // Don't start drag if clicking on a button or the sidebar
+    if (e.target.closest('button') || e.target.closest('.elements-panel')) return;
+
+    const rect = canvasAreaRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setDragStart({ x, y });
+    setDragEnd({ x, y });
+    setIsDragging(false); // Not dragging yet, might be a click
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (!dragStart) return;
+
+    const rect = canvasAreaRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Check if movement exceeds threshold to start a drag
+    const dx = x - dragStart.x;
+    const dy = y - dragStart.y;
+    if (!isDragging && Math.sqrt(dx * dx + dy * dy) > dragThreshold) {
+      setIsDragging(true);
+    }
+
+    setDragEnd({ x, y });
+  };
+
+  // Compute normalized rectangle from two points
+  const getSelectionRect = (start, end) => {
+    const x = Math.min(start.x, end.x);
+    const y = Math.min(start.y, end.y);
+    const width = Math.abs(end.x - start.x);
+    const height = Math.abs(end.y - start.y);
+    return { x, y, width, height };
+  };
+
+  // Refs to avoid stale closures in mouseup handler
+  const dragStateRef = useRef({});
+  const svgElementsRef = useRef(svgElements);
+  const hiddenElementsRef = useRef(hiddenElements);
+  const selectedElementsRef = useRef(selectedElements);
+
+  useEffect(() => { dragStateRef.current = { dragStart, isDragging, dragEnd }; }, [dragStart, isDragging, dragEnd]);
+  useEffect(() => { svgElementsRef.current = svgElements; }, [svgElements]);
+  useEffect(() => { hiddenElementsRef.current = hiddenElements; }, [hiddenElements]);
+  useEffect(() => { selectedElementsRef.current = selectedElements; }, [selectedElements]);
+
+  const handleCanvasMouseUp = (e) => {
+    const { dragStart: ds, isDragging: dragging, dragEnd: de } = dragStateRef.current;
+    if (!ds) return;
+
+    if (dragging && de) {
+      const selRect = getSelectionRect(ds, de);
+      const renderedSvg = containerRef.current?.querySelector('svg');
+
+      if (renderedSvg && canvasAreaRef.current) {
+        const canvasRect = canvasAreaRef.current.getBoundingClientRect();
+
+        // Convert selection rectangle from canvas coords to page coords
+        const selPageLeft = canvasRect.left + selRect.x;
+        const selPageTop = canvasRect.top + selRect.y;
+        const selPageRight = selPageLeft + selRect.width;
+        const selPageBottom = selPageTop + selRect.height;
+
+        const newSelected = new Set(e.shiftKey ? selectedElementsRef.current : []);
+
+        svgElementsRef.current.forEach(el => {
+          if (hiddenElementsRef.current.has(el.id)) return;
+          const node = renderedSvg.querySelector(`[data-element-id="${el.id}"]`);
+          if (!node) return;
+
+          try {
+            const elRect = node.getBoundingClientRect();
+            if (
+              elRect.right > selPageLeft &&
+              elRect.left < selPageRight &&
+              elRect.bottom > selPageTop &&
+              elRect.top < selPageBottom
+            ) {
+              newSelected.add(el.id);
+            }
+          } catch (err) {
+            // Skip elements that can't compute rect
+          }
+        });
+
+        setSelectedElements(newSelected);
+      }
+    }
+
+    setDragStart(null);
+    setDragEnd(null);
+    setIsDragging(false);
+  };
+
+  // Cancel drag if mouse leaves the canvas area
+  const handleCanvasMouseLeave = () => {
+    // Let the drag complete on mouse up even outside
+  };
+
+  // Attach global mouseup to handle drag ending outside canvas
+  useEffect(() => {
+    const handleGlobalMouseUp = (e) => {
+      if (dragStateRef.current.dragStart) {
+        handleCanvasMouseUp(e);
+      }
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
 
   // Close color picker when clicking outside
   useEffect(() => {
@@ -377,8 +501,11 @@ function CleanupEditor({ svgContent, onComplete, onBack }) {
     containerRef.current.innerHTML = '';
     containerRef.current.appendChild(svgClone);
 
-    // Add click handlers
+    // Add click handlers - only for single-element clicks, not drag selections
     const handleClick = (e) => {
+      // If a drag just completed, don't process as a click
+      if (isDragging) return;
+
       const elementId = e.target.getAttribute('data-element-id');
       if (!elementId) return;
 
@@ -386,10 +513,20 @@ function CleanupEditor({ svgContent, onComplete, onBack }) {
 
       setSelectedElements(prev => {
         const next = new Set(prev);
-        if (next.has(elementId)) {
-          next.delete(elementId);
+        if (e.shiftKey) {
+          // Shift+click adds/removes from selection
+          if (next.has(elementId)) {
+            next.delete(elementId);
+          } else {
+            next.add(elementId);
+          }
         } else {
-          next.add(elementId);
+          // Regular click toggles single element
+          if (next.has(elementId)) {
+            next.delete(elementId);
+          } else {
+            next.add(elementId);
+          }
         }
         return next;
       });
@@ -400,7 +537,7 @@ function CleanupEditor({ svgContent, onComplete, onBack }) {
     return () => {
       svgClone.removeEventListener('click', handleClick);
     };
-  }, [parsedSvg, hiddenElements, selectedElements, hoveredElement, colorChanges, opacityChanges]);
+  }, [parsedSvg, hiddenElements, selectedElements, hoveredElement, colorChanges, opacityChanges, isDragging]);
 
   const handleDeleteSelected = () => {
     if (selectedElements.size === 0) return;
@@ -693,7 +830,7 @@ function CleanupEditor({ svgContent, onComplete, onBack }) {
             </button>
             <span className="hidden md:inline text-gray-300 dark:text-gray-600">|</span>
             <span className="hidden md:inline text-sm text-gray-600 dark:text-gray-400">
-              Click elements to select, then delete unwanted parts
+              Click or drag to select elements, then delete unwanted parts
             </span>
           </div>
 
@@ -846,7 +983,14 @@ function CleanupEditor({ svgContent, onComplete, onBack }) {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Canvas Area - Full Size */}
-        <div className="flex-1 flex items-center justify-center p-2 sm:p-4 bg-gray-200 dark:bg-gray-900 overflow-auto">
+        <div
+          ref={canvasAreaRef}
+          className="flex-1 flex items-center justify-center p-2 sm:p-4 bg-gray-200 dark:bg-gray-900 overflow-auto relative select-none"
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseLeave={handleCanvasMouseLeave}
+          style={{ cursor: isDragging ? 'crosshair' : 'default' }}
+        >
           <div className="rounded-xl shadow-lg p-6 w-full h-full max-w-[900px] max-h-[700px] flex items-center justify-center"
             style={{
               /* Dark checkerboard pattern for transparency - like Photoshop */
@@ -868,6 +1012,26 @@ function CleanupEditor({ svgContent, onComplete, onBack }) {
               style={{ minHeight: '500px' }}
             />
           </div>
+
+          {/* Marquee selection rectangle */}
+          {isDragging && dragStart && dragEnd && (() => {
+            const rect = getSelectionRect(dragStart, dragEnd);
+            return (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: rect.x,
+                  top: rect.y,
+                  width: rect.width,
+                  height: rect.height,
+                  border: '2px dashed #0076CE',
+                  backgroundColor: 'rgba(0, 118, 206, 0.1)',
+                  pointerEvents: 'none',
+                  zIndex: 30,
+                }}
+              />
+            );
+          })()}
         </div>
 
         {/* Mobile overlay */}
@@ -946,7 +1110,7 @@ function CleanupEditor({ svgContent, onComplete, onBack }) {
 
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="font-semibold text-gray-900 dark:text-gray-100">All Elements ({visibleElements.length})</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Hover to highlight, click to select</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Click or drag to select, Shift to add</p>
             <div className="flex gap-2 mt-2">
               <button
                 onClick={handleSelectAll}
