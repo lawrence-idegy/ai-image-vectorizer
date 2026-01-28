@@ -17,6 +17,7 @@
     "colorthief": "^2.6.0",
     "fabric": "^6.7.1",
     "jspdf": "^3.0.3",
+    "pdfjs-dist": "^5.4.530",
     "pdfkit": "^0.17.2",
     "react": "^19.1.1",
     "react-color-palette": "^7.3.1",

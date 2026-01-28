@@ -21,6 +21,9 @@ import { ThemeProvider } from './contexts/ThemeContext';
 // API
 import { vectorizeImage, removeBackground, debugUpload } from './services/api';
 
+// Utils
+import { convertPdfToImage, isPdfFile } from './utils/pdfToImage';
+
 function AppContent() {
   // Flow state: 'upload' | 'processing' | 'cleanup' | 'complete'
   const [step, setStep] = useState('upload');
@@ -56,30 +59,33 @@ function AppContent() {
     try {
       let processedFile = file;
 
-      // Debug: Test basic file upload first
-      console.log('[handleUpload] File info:', file.name, file.size, file.type);
-      try {
-        console.log('[handleUpload] Testing debug upload...');
-        const debugResult = await debugUpload(file);
-        console.log('[handleUpload] Debug upload success:', debugResult);
-      } catch (debugErr) {
-        console.error('[handleUpload] Debug upload failed:', debugErr);
-        console.error('[handleUpload] Debug error response:', debugErr.response?.data);
-        console.error('[handleUpload] Debug error status:', debugErr.response?.status);
+      // Step 0: Convert PDF to PNG on the client side (server can't process PDFs on Vercel)
+      if (isPdfFile(file)) {
+        setProcessingStatus('Converting PDF to image...');
+        console.log('[handleUpload] PDF detected, converting client-side...');
+        try {
+          processedFile = await convertPdfToImage(file);
+          console.log('[handleUpload] PDF converted to PNG:', processedFile.name, processedFile.size);
+        } catch (pdfErr) {
+          console.error('[handleUpload] PDF conversion failed:', pdfErr);
+          throw new Error('Failed to convert PDF: ' + pdfErr.message);
+        }
       }
+
+      console.log('[handleUpload] File info:', processedFile.name, processedFile.size, processedFile.type);
 
       // Step 1: Remove background if requested
       if (shouldRemoveBg) {
         setProcessingStatus('Removing background...');
         try {
           console.log('[handleUpload] Calling removeBackground...');
-          const bgResult = await removeBackground(file, { quality: 'balanced' });
+          const bgResult = await removeBackground(processedFile, { quality: 'balanced' });
           console.log('[handleUpload] removeBackground result:', bgResult);
           if (bgResult.success && bgResult.image) {
             // Convert data URI back to File
             const response = await fetch(bgResult.image);
             const blob = await response.blob();
-            processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '_nobg.png'), { type: 'image/png' });
+            processedFile = new File([blob], processedFile.name.replace(/\.[^.]+$/, '_nobg.png'), { type: 'image/png' });
           }
         } catch (bgErr) {
           console.error('[handleUpload] Background removal error:', bgErr);
