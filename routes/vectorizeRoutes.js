@@ -23,15 +23,22 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
   const cacheService = req.app.get('cache');
   const websocketService = req.app.get('websocket');
   const storageService = req.app.get('storage');
+  console.log('[vectorize] Request received, user:', req.user?.email);
 
   upload.single('image')(req, res, async (error) => {
+    console.log('[vectorize] Upload callback, error:', error, 'file:', req.file ? 'present' : 'missing');
+
     if (error) {
+      console.error('[vectorize] Upload error:', error);
       return res.status(400).json({ success: false, error: error.message });
     }
 
     if (!req.file) {
+      console.error('[vectorize] No file in request');
       return res.status(400).json({ success: false, error: 'No image file provided' });
     }
+
+    console.log('[vectorize] File received:', req.file.originalname, 'size:', req.file.size, 'buffer:', req.file.buffer ? 'present' : 'missing');
 
     const startTime = Date.now();
 
@@ -252,7 +259,8 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
       res.json(result);
 
     } catch (error) {
-      console.error('Vectorization error:', error);
+      console.error('[vectorize] ERROR:', error.message);
+      console.error('[vectorize] Stack:', error.stack);
 
       if (req.file?.path) {
         await fs.unlink(req.file.path).catch(() => {});
@@ -646,15 +654,22 @@ router.get('/background-removal-models', asyncHandler(async (req, res) => {
  */
 router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => {
   const upload = req.app.get('upload');
+  console.log('[remove-background] Request received, user:', req.user?.email);
 
   upload.single('image')(req, res, async (error) => {
+    console.log('[remove-background] Upload callback, error:', error, 'file:', req.file ? 'present' : 'missing');
+
     if (error) {
+      console.error('[remove-background] Upload error:', error);
       return res.status(400).json({ success: false, error: error.message });
     }
 
     if (!req.file) {
+      console.error('[remove-background] No file in request');
       return res.status(400).json({ success: false, error: 'No image file provided' });
     }
+
+    console.log('[remove-background] File received:', req.file.originalname, 'size:', req.file.size, 'buffer:', req.file.buffer ? 'present' : 'missing');
 
     try {
       // Check if background removal is available
@@ -702,7 +717,8 @@ router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => 
       });
 
     } catch (error) {
-      console.error('Background removal error:', error);
+      console.error('[remove-background] ERROR:', error.message);
+      console.error('[remove-background] Stack:', error.stack);
 
       if (req.file?.path) {
         await fs.unlink(req.file.path).catch(() => {});
