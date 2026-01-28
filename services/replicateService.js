@@ -2,16 +2,33 @@ const Replicate = require('replicate');
 
 class ReplicateService {
   constructor() {
+    this.available = false;
+    this.replicate = null;
+
     if (!process.env.REPLICATE_API_TOKEN) {
-      throw new Error('REPLICATE_API_TOKEN is not set in environment variables');
+      console.warn('WARNING: REPLICATE_API_TOKEN is not set - vectorization will not be available');
+      return;
     }
 
-    this.replicate = new Replicate({
-      auth: process.env.REPLICATE_API_TOKEN,
-    });
+    try {
+      this.replicate = new Replicate({
+        auth: process.env.REPLICATE_API_TOKEN,
+      });
+      this.available = true;
+    } catch (error) {
+      console.error('Failed to initialize Replicate client:', error.message);
+    }
 
     // Recraft Vectorize model
     this.model = 'recraft-ai/recraft-vectorize';
+  }
+
+  /**
+   * Check if the service is available
+   * @returns {boolean}
+   */
+  isAvailable() {
+    return this.available && !!this.replicate;
   }
 
   /**
@@ -21,6 +38,10 @@ class ReplicateService {
    * @returns {Promise<string>} - SVG content as string
    */
   async vectorizeImage(imageUrl, options = {}) {
+    if (!this.isAvailable()) {
+      throw new Error('Replicate service is not available - REPLICATE_API_TOKEN not configured');
+    }
+
     try {
       console.log('Starting vectorization with Replicate AI...');
 
@@ -91,13 +112,7 @@ class ReplicateService {
    * @returns {Promise<boolean>}
    */
   async checkHealth() {
-    try {
-      // Just check if we can create a client - actual API calls cost money
-      return !!this.replicate && !!process.env.REPLICATE_API_TOKEN;
-    } catch (error) {
-      console.error('Replicate health check failed:', error);
-      return false;
-    }
+    return this.isAvailable();
   }
 }
 
