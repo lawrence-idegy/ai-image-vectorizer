@@ -1,4 +1,4 @@
-# SYSTEM_MAP.md - idegy Vector Fix v2.1
+# SYSTEM_MAP.md - idegy Vector Fix v2.2
 
 ## Overview
 
@@ -63,7 +63,8 @@ npm run dev
 
 ### Step 1: Upload
 - Drag & drop or click to browse
-- Accepts: JPG, PNG, PDF (up to 50MB)
+- Accepts: JPG, PNG, WEBP, PDF (up to 50MB)
+- PDF files are automatically converted to images (first page)
 - Optional client/project names for auto-file-naming
 - Option: Remove background (AI-powered) or keep as-is
 
@@ -144,6 +145,7 @@ npm run dev
 │  │                                                                           │ │
 │  │  replicateService.js ─────▶ AI vectorization (Replicate API)              │ │
 │  │  backgroundRemovalService.js ─▶ AI background removal (3 quality modes)   │ │
+│  │  pdfConverter.js ────────▶ PDF to image conversion (pdfjs-dist)           │ │
 │  │  svgOptimizer.js ─────────▶ SVGO optimization & sanitization              │ │
 │  │  qualityValidator.js ─────▶ SVG quality scoring & validation              │ │
 │  │  formatConverter.js ──────▶ SVG → PDF/EPS/AI conversion                   │ │
@@ -202,6 +204,7 @@ ai-image-vectorizer/
 ├── services/
 │   ├── replicateService.js      # Replicate AI API integration
 │   ├── backgroundRemovalService.js  # Multi-model background removal
+│   ├── pdfConverter.js          # PDF to image conversion
 │   ├── svgOptimizer.js          # SVGO optimization & sanitization
 │   ├── qualityValidator.js      # SVG quality scoring (0-100)
 │   ├── formatConverter.js       # PDF/EPS/AI conversion
@@ -420,6 +423,8 @@ LOG_LEVEL=debug
 | winston | 3.17.x | Logging |
 | pdfkit | 0.17.x | PDF generation |
 | svg-to-pdfkit | 0.1.x | SVG to PDF conversion |
+| pdfjs-dist | 4.x | PDF to image conversion (input) |
+| canvas | 3.x | Node canvas for PDF rendering |
 
 ### Frontend
 
@@ -504,6 +509,7 @@ npm start                      # Runs production server serving client/dist
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.2.0 | 2026-01-27 | Added PDF file support (auto-converts to image for vectorization) |
 | 2.1.0 | 2026-01-27 | Dark/light theme, responsive UI, idegy branding, login-only auth |
 | 2.0.1 | 2026-01-27 | Removed Potrace fallback, cleaned dead code |
 | 2.0.0 | 2026-01-23 | Simplified 4-step UI flow |
@@ -512,4 +518,4 @@ npm start                      # Runs production server serving client/dist
 ---
 
 *Last Updated: 2026-01-27*
-*Version: 2.1.0*
+*Version: 2.2.0*

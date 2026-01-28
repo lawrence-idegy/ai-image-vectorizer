@@ -7,6 +7,7 @@ const replicateService = require('../services/replicateService');
 const qualityValidator = require('../services/qualityValidator');
 const backgroundRemovalService = require('../services/backgroundRemovalService');
 const svgOptimizer = require('../services/svgOptimizer');
+const pdfConverter = require('../services/pdfConverter');
 const { validate } = require('../middleware/validation');
 const { asyncHandler, ProcessingError, NotFoundError } = require('../utils/errors');
 const { requireAuth } = require('../services/authService');
@@ -46,6 +47,22 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
       } = req.body;
 
       let imageBuffer = await fs.readFile(req.file.path);
+
+      // Convert PDF to image if needed
+      if (req.file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
+        console.log('Converting PDF to image for vectorization...');
+        try {
+          const pdfInfo = await pdfConverter.getPdfInfo(imageBuffer);
+          console.log(`PDF has ${pdfInfo.numPages} page(s), dimensions: ${pdfInfo.width}x${pdfInfo.height}`);
+
+          // Convert first page to PNG (scale 2x for better quality)
+          imageBuffer = await pdfConverter.pdfToImage(imageBuffer, { page: 1, scale: 2 });
+          console.log('PDF converted to PNG successfully');
+        } catch (pdfError) {
+          console.error('PDF conversion failed:', pdfError);
+          throw new ProcessingError('Failed to convert PDF to image: ' + pdfError.message);
+        }
+      }
 
       // Check cache first
       const cacheKey = cacheService.generateSVGKey(imageBuffer, { method, detailLevel, removeBackground });
@@ -290,6 +307,12 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
         });
 
         let imageBuffer = await fs.readFile(file.path);
+
+        // Convert PDF to image if needed
+        if (file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
+          console.log(`Batch: Converting PDF ${file.originalname} to image...`);
+          imageBuffer = await pdfConverter.pdfToImage(imageBuffer, { page: 1, scale: 2 });
+        }
 
         // Preprocess image: always convert to PNG for better Replicate compatibility
         const metadata = await sharp(imageBuffer).metadata();
@@ -626,8 +649,17 @@ router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => 
       const quality = req.body.quality || 'balanced';
       const threshold = req.body.threshold ? parseFloat(req.body.threshold) : undefined;
 
-      const imageBuffer = await fs.readFile(req.file.path);
-      const dataUri = replicateService.bufferToDataUri(imageBuffer, req.file.mimetype);
+      let imageBuffer = await fs.readFile(req.file.path);
+      let mimeType = req.file.mimetype;
+
+      // Convert PDF to image if needed
+      if (req.file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
+        console.log('Converting PDF to image for background removal...');
+        imageBuffer = await pdfConverter.pdfToImage(imageBuffer, { page: 1, scale: 2 });
+        mimeType = 'image/png';
+      }
+
+      const dataUri = replicateService.bufferToDataUri(imageBuffer, mimeType);
 
       console.log(`Starting background removal with ${quality} quality...`);
       const processedDataUri = await backgroundRemovalService.removeBackground(dataUri, {

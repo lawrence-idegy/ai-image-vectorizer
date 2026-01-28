@@ -10,8 +10,8 @@ function SimpleUpload({ onUpload, disabled }) {
   const [error, setError] = useState(null);
   const [removeBackground, setRemoveBackground] = useState(true);
 
-  const acceptedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-  const acceptedExtensions = ['.jpg', '.jpeg', '.png', '.pdf'];
+  const acceptedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  const acceptedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
 
   const validateFile = (file) => {
     if (!file) return 'No file selected';
@@ -20,7 +20,7 @@ function SimpleUpload({ onUpload, disabled }) {
       acceptedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 
     if (!isValidType) {
-      return 'Please upload a JPG, PNG, or PDF file';
+      return 'Please upload a JPG, PNG, WEBP, or PDF file';
     }
 
     // 50MB limit
@@ -131,7 +131,7 @@ function SimpleUpload({ onUpload, disabled }) {
           <input
             id="file-input"
             type="file"
-            accept=".jpg,.jpeg,.png,.pdf"
+            accept=".jpg,.jpeg,.png,.webp,.pdf"
             onChange={handleFileInput}
             className="hidden"
             disabled={disabled}
@@ -185,7 +185,7 @@ function SimpleUpload({ onUpload, disabled }) {
                 <p className="text-gray-500 dark:text-gray-400 mt-1">or click to browse</p>
               </div>
               <p className="text-sm text-gray-400 dark:text-gray-500">
-                JPG, PNG, or PDF
+                JPG, PNG, WEBP, or PDF
               </p>
             </div>
           )}
