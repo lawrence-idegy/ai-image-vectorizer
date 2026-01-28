@@ -19,6 +19,20 @@
       "dest": "/server.js"
     },
     {
+      "src": "/assets/(.*)",
+      "dest": "/client/assets/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/index.html",
+      "dest": "/client/index.html",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
+    {
       "src": "/(.*)",
       "dest": "/client/$1"
     }
