@@ -14,6 +14,48 @@ const { requireAuth } = require('../services/authService');
 const { apiLogger } = require('../utils/logger');
 
 /**
+ * POST /api/debug-upload
+ * Debug endpoint to test file uploads
+ */
+router.post('/debug-upload', (req, res) => {
+  const upload = req.app.get('upload');
+  console.log('[debug-upload] Request received');
+  console.log('[debug-upload] Headers:', JSON.stringify(req.headers, null, 2));
+
+  upload.single('image')(req, res, (error) => {
+    console.log('[debug-upload] Upload callback');
+    console.log('[debug-upload] Error:', error);
+    console.log('[debug-upload] File:', req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      encoding: req.file.encoding,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      hasBuffer: !!req.file.buffer,
+      bufferLength: req.file.buffer?.length
+    } : 'none');
+    console.log('[debug-upload] Body:', req.body);
+
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    res.json({
+      success: true,
+      message: 'Debug upload received',
+      hasFile: !!req.file,
+      file: req.file ? {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        hasBuffer: !!req.file.buffer
+      } : null,
+      body: req.body
+    });
+  });
+});
+
+/**
  * POST /api/vectorize
  * Convert a single image to SVG vector
  * Requires authentication with @idegy.com email
