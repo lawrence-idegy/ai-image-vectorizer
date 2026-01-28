@@ -100,6 +100,14 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
 
       // Convert PDF to image if needed
       if (req.file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
+        // Check if PDF processing is available
+        if (!pdfConverter.isAvailable()) {
+          return res.status(400).json({
+            success: false,
+            error: 'PDF files are not supported in this environment. Please convert your PDF to a PNG or JPG image before uploading.'
+          });
+        }
+
         console.log('Converting PDF to image for vectorization...');
         try {
           const pdfInfo = await pdfConverter.getPdfInfo(imageBuffer);
@@ -371,6 +379,9 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
 
         // Convert PDF to image if needed
         if (file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
+          if (!pdfConverter.isAvailable()) {
+            throw new Error('PDF files are not supported. Please convert to PNG or JPG first.');
+          }
           console.log(`Batch: Converting PDF ${file.originalname} to image...`);
           imageBuffer = await pdfConverter.pdfToImage(imageBuffer, { page: 1, scale: 2 });
         }
@@ -734,6 +745,14 @@ router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => 
 
       // Convert PDF to image if needed
       if (req.file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
+        // Check if PDF processing is available
+        if (!pdfConverter.isAvailable()) {
+          return res.status(400).json({
+            success: false,
+            error: 'PDF files are not supported in this environment. Please convert your PDF to a PNG or JPG image before uploading.'
+          });
+        }
+
         console.log('Converting PDF to image for background removal...');
         imageBuffer = await pdfConverter.pdfToImage(imageBuffer, { page: 1, scale: 2 });
         mimeType = 'image/png';

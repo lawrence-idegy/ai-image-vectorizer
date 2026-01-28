@@ -3,21 +3,41 @@
  * Converts PDF files to PNG images for vectorization
  */
 
-const { createCanvas } = require('canvas');
+const { createCanvas, DOMMatrix: CanvasDOMMatrix } = require('canvas');
 const fs = require('fs').promises;
 const path = require('path');
 
+// Polyfill DOMMatrix for Node.js (required by pdfjs-dist)
+// This must be done before importing pdfjs-dist
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = CanvasDOMMatrix;
+}
+
 // pdfjs-dist requires special handling for Node.js
 let pdfjsLib = null;
+let pdfJsAvailable = true;
 
 async function initPdfJs() {
   if (pdfjsLib) return pdfjsLib;
 
-  // Dynamic import for ES module compatibility
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  pdfjsLib = pdfjs;
+  try {
+    // Dynamic import for ES module compatibility
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjsLib = pdfjs;
+    return pdfjsLib;
+  } catch (error) {
+    console.error('Failed to initialize pdfjs-dist:', error.message);
+    pdfJsAvailable = false;
+    throw new Error('PDF processing is not available in this environment');
+  }
+}
 
-  return pdfjsLib;
+/**
+ * Check if PDF processing is available
+ * @returns {boolean}
+ */
+function isAvailable() {
+  return pdfJsAvailable && typeof globalThis.DOMMatrix !== 'undefined';
 }
 
 /**
@@ -29,6 +49,10 @@ async function initPdfJs() {
  * @returns {Promise<Buffer>} PNG image buffer
  */
 async function pdfToImage(pdfBuffer, options = {}) {
+  if (!isAvailable()) {
+    throw new Error('PDF processing is not available. Please convert your PDF to an image (PNG, JPG) before uploading.');
+  }
+
   const { page = 1, scale = 2 } = options;
 
   const pdfjs = await initPdfJs();
@@ -126,4 +150,5 @@ module.exports = {
   pdfToImage,
   getPdfInfo,
   isPdf,
+  isAvailable,
 };
