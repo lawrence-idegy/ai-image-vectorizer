@@ -9,9 +9,15 @@ console.log('API URL:', API_URL, 'Production:', isProduction);
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+});
+
+// Axios interceptor to set Content-Type based on data type
+api.interceptors.request.use((config) => {
+  // Don't set Content-Type for FormData - browser will set it with boundary
+  if (!(config.data instanceof FormData)) {
+    config.headers['Content-Type'] = 'application/json';
+  }
+  return config;
 });
 
 // Add auth token to requests
