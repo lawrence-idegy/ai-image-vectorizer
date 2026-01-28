@@ -65,7 +65,7 @@ router.post('/convert/:filename', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Format conversion error:', error);
+
     res.status(500).json({
       success: false,
       error: 'Format conversion failed',
@@ -131,7 +131,7 @@ router.post('/export-formats', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Multi-format export error:', error);
+
     res.status(500).json({
       success: false,
       error: 'Export failed',

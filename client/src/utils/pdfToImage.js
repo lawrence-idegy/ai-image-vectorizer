@@ -31,8 +31,6 @@ export async function convertPdfToImage(pdfFile, options = {}) {
     cMapPacked: true,
   }).promise;
 
-  console.log(`[pdfToImage] PDF loaded: ${pdf.numPages} page(s)`);
-
   // Get the requested page
   const pageNum = Math.min(page, pdf.numPages);
   const pdfPage = await pdf.getPage(pageNum);
@@ -57,8 +55,6 @@ export async function convertPdfToImage(pdfFile, options = {}) {
     viewport: viewport,
   }).promise;
 
-  console.log(`[pdfToImage] Page ${pageNum} rendered: ${canvas.width}x${canvas.height}`);
-
   // Convert canvas to PNG blob
   const blob = await new Promise((resolve) => {
     canvas.toBlob(resolve, 'image/png', 1.0);
@@ -67,8 +63,6 @@ export async function convertPdfToImage(pdfFile, options = {}) {
   // Create a new File object with the original name but .png extension
   const pngName = pdfFile.name.replace(/\.pdf$/i, '.png');
   const pngFile = new File([blob], pngName, { type: 'image/png' });
-
-  console.log(`[pdfToImage] Converted "${pdfFile.name}" to "${pngName}" (${(pngFile.size / 1024).toFixed(1)} KB)`);
 
   // Clean up
   pdf.destroy();

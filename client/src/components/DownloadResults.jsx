@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
-import { downloadSVGFile, exportAsAI, exportAsEPS, exportAsPDF } from '../utils/exportUtils';
+import { downloadSVGFile, exportAsAI, exportAsPDF } from '../utils/exportUtils';
 
 // Auto-naming helper functions
 function sanitizeFilename(str) {

@@ -180,7 +180,7 @@ function SimpleUpload({ onUpload, disabled }) {
               </div>
               <div>
                 <p className="text-xl font-medium text-gray-900 dark:text-gray-100">
-                  {dragActive ? 'Drop your logo here' : 'Drop your logo here'}
+                  {dragActive ? 'Drop it!' : 'Drop your logo here'}
                 </p>
                 <p className="text-gray-500 dark:text-gray-400 mt-1">or click to browse</p>
               </div>

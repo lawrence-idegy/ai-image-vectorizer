@@ -14,21 +14,6 @@ class StorageService {
     this.uploadDir = path.join(this.baseDir, 'uploads');
     this.outputDir = path.join(this.baseDir, 'output');
 
-    // S3 configuration (for future use)
-    this.s3Config = {
-      bucket: process.env.AWS_S3_BUCKET,
-      region: process.env.AWS_REGION,
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    };
-
-    // Cloudinary configuration (for future use)
-    this.cloudinaryConfig = {
-      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-      apiKey: process.env.CLOUDINARY_API_KEY,
-      apiSecret: process.env.CLOUDINARY_API_SECRET,
-    };
-
     // Skip directory creation on serverless platforms (read-only filesystem)
     if (!process.env.VERCEL) {
       this.ensureDirectories();

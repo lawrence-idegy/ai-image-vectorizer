@@ -14,48 +14,6 @@ const { requireAuth } = require('../services/authService');
 const { apiLogger } = require('../utils/logger');
 
 /**
- * POST /api/debug-upload
- * Debug endpoint to test file uploads
- */
-router.post('/debug-upload', (req, res) => {
-  const upload = req.app.get('upload');
-  console.log('[debug-upload] Request received');
-  console.log('[debug-upload] Headers:', JSON.stringify(req.headers, null, 2));
-
-  upload.single('image')(req, res, (error) => {
-    console.log('[debug-upload] Upload callback');
-    console.log('[debug-upload] Error:', error);
-    console.log('[debug-upload] File:', req.file ? {
-      fieldname: req.file.fieldname,
-      originalname: req.file.originalname,
-      encoding: req.file.encoding,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-      hasBuffer: !!req.file.buffer,
-      bufferLength: req.file.buffer?.length
-    } : 'none');
-    console.log('[debug-upload] Body:', req.body);
-
-    if (error) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-
-    res.json({
-      success: true,
-      message: 'Debug upload received',
-      hasFile: !!req.file,
-      file: req.file ? {
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        hasBuffer: !!req.file.buffer
-      } : null,
-      body: req.body
-    });
-  });
-});
-
-/**
  * POST /api/vectorize
  * Convert a single image to SVG vector
  * Requires authentication with @idegy.com email
@@ -65,22 +23,14 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
   const cacheService = req.app.get('cache');
   const websocketService = req.app.get('websocket');
   const storageService = req.app.get('storage');
-  console.log('[vectorize] Request received, user:', req.user?.email);
-
   upload.single('image')(req, res, async (error) => {
-    console.log('[vectorize] Upload callback, error:', error, 'file:', req.file ? 'present' : 'missing');
-
     if (error) {
-      console.error('[vectorize] Upload error:', error);
       return res.status(400).json({ success: false, error: error.message });
     }
 
     if (!req.file) {
-      console.error('[vectorize] No file in request');
       return res.status(400).json({ success: false, error: 'No image file provided' });
     }
-
-    console.log('[vectorize] File received:', req.file.originalname, 'size:', req.file.size, 'buffer:', req.file.buffer ? 'present' : 'missing');
 
     const startTime = Date.now();
 
@@ -100,16 +50,9 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
 
       // Convert PDF to image if needed
       if (req.file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
-        console.log('Converting PDF to image for vectorization...');
         try {
-          const pdfInfo = await pdfConverter.getPdfInfo(imageBuffer);
-          console.log(`PDF has ${pdfInfo.numPages} page(s), dimensions: ${pdfInfo.width}x${pdfInfo.height}`);
-
-          // Convert first page to PNG (scale 2x for better quality)
           imageBuffer = await pdfConverter.pdfToImage(imageBuffer, { page: 1, scale: 2 });
-          console.log('PDF converted to PNG successfully');
         } catch (pdfError) {
-          console.error('PDF conversion failed:', pdfError);
           throw new ProcessingError(pdfError.message);
         }
       }
@@ -175,12 +118,8 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
         targetWidth = Math.round(metadata.width * scale);
         targetHeight = Math.round(metadata.height * scale);
         resizeOptions = { width: targetWidth, height: targetHeight, fit: 'fill' };
-        console.log(`Upscaling small image: ${metadata.format} ${metadata.width}x${metadata.height} -> ${targetWidth}x${targetHeight} PNG`);
       } else if (needsDownscale) {
         resizeOptions = { width: maxDimension, height: maxDimension, fit: 'inside', withoutEnlargement: true };
-        console.log(`Downscaling large image: ${metadata.format} ${metadata.width}x${metadata.height} -> max ${maxDimension}px PNG`);
-      } else if (isJpeg || metadata.format !== 'png') {
-        console.log(`Converting image: ${metadata.format} ${metadata.width}x${metadata.height} -> PNG`);
       }
 
       // Always convert to PNG
@@ -301,9 +240,6 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
       res.json(result);
 
     } catch (error) {
-      console.error('[vectorize] ERROR:', error.message);
-      console.error('[vectorize] Stack:', error.stack);
-
       if (req.file?.path) {
         await fs.unlink(req.file.path).catch(() => {});
       }
@@ -371,7 +307,6 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
 
         // Convert PDF to image if needed
         if (file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
-          console.log(`Batch: Converting PDF ${file.originalname} to image...`);
           imageBuffer = await pdfConverter.pdfToImage(imageBuffer, { page: 1, scale: 2 });
         }
 
@@ -392,12 +327,8 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
           const targetWidth = Math.round(metadata.width * scale);
           const targetHeight = Math.round(metadata.height * scale);
           resizeOptions = { width: targetWidth, height: targetHeight, fit: 'fill' };
-          console.log(`Batch: Upscaling ${file.originalname}: ${metadata.width}x${metadata.height} -> ${targetWidth}x${targetHeight} PNG`);
         } else if (needsDownscale) {
           resizeOptions = { width: maxDimension, height: maxDimension, fit: 'inside', withoutEnlargement: true };
-          console.log(`Batch: Downscaling ${file.originalname}: ${metadata.width}x${metadata.height} -> max ${maxDimension}px PNG`);
-        } else {
-          console.log(`Batch: Converting ${file.originalname}: ${metadata.format} ${metadata.width}x${metadata.height} -> PNG`);
         }
 
         imageBuffer = await sharp(imageBuffer)
@@ -580,7 +511,6 @@ router.get('/download/:filename', asyncHandler(async (req, res) => {
       SVGtoPDF(doc, svgContent, 0, 0, { width, height });
       doc.end();
     } catch (err) {
-      console.error('PDF conversion error:', err);
       throw new NotFoundError('File');
     }
   }
@@ -696,22 +626,14 @@ router.get('/background-removal-models', asyncHandler(async (req, res) => {
  */
 router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => {
   const upload = req.app.get('upload');
-  console.log('[remove-background] Request received, user:', req.user?.email);
-
   upload.single('image')(req, res, async (error) => {
-    console.log('[remove-background] Upload callback, error:', error, 'file:', req.file ? 'present' : 'missing');
-
     if (error) {
-      console.error('[remove-background] Upload error:', error);
       return res.status(400).json({ success: false, error: error.message });
     }
 
     if (!req.file) {
-      console.error('[remove-background] No file in request');
       return res.status(400).json({ success: false, error: 'No image file provided' });
     }
-
-    console.log('[remove-background] File received:', req.file.originalname, 'size:', req.file.size, 'buffer:', req.file.buffer ? 'present' : 'missing');
 
     try {
       // Check if background removal is available
@@ -734,19 +656,16 @@ router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => 
 
       // Convert PDF to image if needed
       if (req.file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
-        console.log('Converting PDF to image for background removal...');
         imageBuffer = await pdfConverter.pdfToImage(imageBuffer, { page: 1, scale: 2 });
         mimeType = 'image/png';
       }
 
       const dataUri = replicateService.bufferToDataUri(imageBuffer, mimeType);
 
-      console.log(`Starting background removal with ${quality} quality...`);
       const processedDataUri = await backgroundRemovalService.removeBackground(dataUri, {
         quality,
         threshold
       });
-      console.log('Background removal completed');
 
       // Clean up uploaded file (only if using disk storage)
       if (req.file?.path) await fs.unlink(req.file.path).catch(() => {});
@@ -759,9 +678,6 @@ router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => 
       });
 
     } catch (error) {
-      console.error('[remove-background] ERROR:', error.message);
-      console.error('[remove-background] Stack:', error.stack);
-
       if (req.file?.path) {
         await fs.unlink(req.file.path).catch(() => {});
       }
@@ -927,8 +843,6 @@ router.post('/remove-background-with-mask', requireAuth, asyncHandler(async (req
       });
 
     } catch (error) {
-      console.error('Background removal with mask error:', error);
-
       // Clean up temp files (only if using disk storage)
       if (req.files?.image?.[0]?.path) {
         await fs.unlink(req.files.image[0].path).catch(() => {});

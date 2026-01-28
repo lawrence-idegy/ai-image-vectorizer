@@ -38,18 +38,6 @@ export const downloadSVGFile = (svgContent, filename) => {
 };
 
 /**
- * Download JSON file using base64 encoding
- */
-export const downloadJSONFile = (jsonContent, filename) => {
-  const jsonString = typeof jsonContent === 'string'
-    ? jsonContent
-    : JSON.stringify(jsonContent, null, 2);
-  const base64 = btoa(unescape(encodeURIComponent(jsonString)));
-  const dataUrl = `data:application/json;base64,${base64}`;
-  downloadFile(dataUrl, filename);
-};
-
-/**
  * Export canvas as PDF
  */
 export const exportAsPDF = async (svgString, width, height, filename = 'canvas-export.pdf') => {
@@ -98,30 +86,3 @@ export const exportAsAI = async (svgString, width, height, filename = 'canvas-ex
   pdf.save(filename);
 };
 
-/**
- * Export canvas as EPS
- * Creates a PDF that can be opened in Illustrator and saved as EPS
- */
-export const exportAsEPS = async (svgString, width, height, filename = 'canvas-export.eps') => {
-  const { jsPDF } = await import('jspdf');
-  await import('svg2pdf.js');
-
-  const parser = new DOMParser();
-  const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
-  const svgElement = svgDoc.documentElement;
-
-  const pdf = new jsPDF({
-    orientation: width > height ? 'landscape' : 'portrait',
-    unit: 'px',
-    format: [width, height],
-  });
-
-  pdf.setProperties({
-    title: 'Canvas Export',
-    creator: 'idegy Vectorizer',
-    subject: 'Vector Graphics - Open in Illustrator and Save As EPS',
-  });
-
-  await pdf.svg(svgElement, { x: 0, y: 0, width, height });
-  pdf.save(filename);
-};

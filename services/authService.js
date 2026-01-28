@@ -47,7 +47,7 @@ const getEnvUser = (email) => {
 
 class AuthService {
   constructor() {
-    console.log(`Auth service initialized. Demo login: ${DEMO_EMAIL}`);
+    // Auth service initialized
   }
 
   /**
@@ -269,13 +269,10 @@ const authMiddleware = (options = {}) => {
   const authService = new AuthService();
 
   return (req, res, next) => {
-    console.log('[auth] Checking auth for:', req.method, req.path);
-
     try {
       const authHeader = req.headers.authorization;
 
       if (!authHeader) {
-        console.log('[auth] No auth header, required:', required);
         if (required) {
           return next(new AuthenticationError('Authorization header required'));
         }
@@ -291,26 +288,21 @@ const authMiddleware = (options = {}) => {
       const token = parts[1];
 
       const decoded = authService.verifyToken(token);
-      console.log('[auth] Token verified for:', decoded.email);
 
       // Check if it's an access token
       if (decoded.type !== 'access') {
-        console.log('[auth] Invalid token type:', decoded.type);
         return next(new AuthenticationError('Invalid token type'));
       }
 
       // Check role if specified
       if (roles.length > 0 && !roles.includes(decoded.role)) {
-        console.log('[auth] Insufficient role:', decoded.role);
         return next(new AuthorizationError('Insufficient permissions'));
       }
 
       // Attach user to request
       req.user = decoded;
-      console.log('[auth] Auth successful for:', decoded.email);
       next();
     } catch (error) {
-      console.error('[auth] Auth failed:', error.message);
       if (error instanceof AuthenticationError || error instanceof AuthorizationError) {
         return next(error);
       }

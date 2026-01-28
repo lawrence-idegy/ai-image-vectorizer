@@ -19,7 +19,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { ThemeProvider } from './contexts/ThemeContext';
 
 // API
-import { vectorizeImage, removeBackground, debugUpload } from './services/api';
+import { vectorizeImage, removeBackground } from './services/api';
 
 // Utils
 import { convertPdfToImage, isPdfFile } from './utils/pdfToImage';
@@ -62,25 +62,18 @@ function AppContent() {
       // Step 0: Convert PDF to PNG on the client side (server can't process PDFs on Vercel)
       if (isPdfFile(file)) {
         setProcessingStatus('Converting PDF to image...');
-        console.log('[handleUpload] PDF detected, converting client-side...');
         try {
           processedFile = await convertPdfToImage(file);
-          console.log('[handleUpload] PDF converted to PNG:', processedFile.name, processedFile.size);
         } catch (pdfErr) {
-          console.error('[handleUpload] PDF conversion failed:', pdfErr);
           throw new Error('Failed to convert PDF: ' + pdfErr.message);
         }
       }
-
-      console.log('[handleUpload] File info:', processedFile.name, processedFile.size, processedFile.type);
 
       // Step 1: Remove background if requested
       if (shouldRemoveBg) {
         setProcessingStatus('Removing background...');
         try {
-          console.log('[handleUpload] Calling removeBackground...');
           const bgResult = await removeBackground(processedFile, { quality: 'balanced' });
-          console.log('[handleUpload] removeBackground result:', bgResult);
           if (bgResult.success && bgResult.image) {
             // Convert data URI back to File
             const response = await fetch(bgResult.image);
@@ -88,16 +81,12 @@ function AppContent() {
             processedFile = new File([blob], processedFile.name.replace(/\.[^.]+$/, '_nobg.png'), { type: 'image/png' });
           }
         } catch (bgErr) {
-          console.error('[handleUpload] Background removal error:', bgErr);
-          console.error('[handleUpload] BG error response:', bgErr.response?.data);
-          console.error('[handleUpload] BG error status:', bgErr.response?.status);
           // Continue with original file if background removal fails
         }
       }
 
       // Step 2: Vectorize the image using AI
       setProcessingStatus('Vectorizing with AI...');
-      console.log('[handleUpload] Calling vectorizeImage...');
 
       const vectorOptions = {
         method: 'ai',
@@ -106,7 +95,6 @@ function AppContent() {
       };
 
       const result = await vectorizeImage(processedFile, vectorOptions);
-      console.log('[handleUpload] vectorizeImage result:', result);
 
       if (result.success) {
         setSvgContent(result.svgContent);
@@ -115,8 +103,6 @@ function AppContent() {
         throw new Error(result.message || 'Vectorization failed');
       }
     } catch (err) {
-      console.error('Vectorization error:', err);
-      // Extract error message from Axios error response or use fallback
       const errorMessage = err.response?.data?.message || err.message || 'An error occurred during vectorization';
       setError(errorMessage);
       setStep('upload');
