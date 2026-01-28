@@ -122,8 +122,15 @@ async function initPdfJs() {
   try {
     // Dynamic import for ES module compatibility
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+    // Disable worker to avoid module loading issues on serverless
+    // This runs PDF processing in the main thread which is fine for serverless
+    if (pdfjs.GlobalWorkerOptions) {
+      pdfjs.GlobalWorkerOptions.workerSrc = '';
+    }
+
     pdfjsLib = pdfjs;
-    console.log('pdfjs-dist initialized successfully');
+    console.log('pdfjs-dist initialized successfully (worker disabled)');
     return pdfjsLib;
   } catch (error) {
     console.error('Failed to initialize pdfjs-dist:', error.message);
@@ -161,13 +168,15 @@ async function pdfToImage(pdfBuffer, options = {}) {
   // Create canvas factory for Node.js
   const canvasFactory = new NodeCanvasFactory();
 
-  // Load the PDF document
+  // Load the PDF document (worker disabled for serverless compatibility)
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(pdfBuffer),
     useSystemFonts: true,
     standardFontDataUrl: fontsUrl,
     canvasFactory: canvasFactory,
     isEvalSupported: false,
+    disableWorker: true,
+    useWorkerFetch: false,
   });
 
   const pdfDoc = await loadingTask.promise;
@@ -219,6 +228,8 @@ async function getPdfInfo(pdfBuffer) {
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(pdfBuffer),
     canvasFactory: canvasFactory,
+    disableWorker: true,
+    useWorkerFetch: false,
   });
 
   const pdfDoc = await loadingTask.promise;
