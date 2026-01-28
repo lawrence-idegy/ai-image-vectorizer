@@ -180,9 +180,18 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
         svgToSave = sanitized.data;
       }
 
-      // Save SVG
-      const outputFilename = `${path.parse(req.file.filename).name}.svg`;
-      const saveResult = await storageService.saveSVG(svgToSave, outputFilename);
+      // Save SVG - generate filename from originalname if filename not available (memory storage)
+      const baseName = req.file.filename
+        ? path.parse(req.file.filename).name
+        : `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+      const outputFilename = `${baseName}.svg`;
+
+      // On Vercel/serverless, skip disk storage (read-only filesystem)
+      // SVG content is returned directly in the response
+      const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+      if (!isServerless) {
+        await storageService.saveSVG(svgToSave, outputFilename);
+      }
 
       // Validate quality
       const qualityMetrics = qualityValidator.validateSVG(svgToSave);
@@ -376,14 +385,21 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
           svgContent = sanitized.data;
         }
 
-        // Determine output filename and format
-        const baseName = path.parse(file.filename).name;
+        // Determine output filename and format - generate if not available (memory storage)
+        const baseName = file.filename
+          ? path.parse(file.filename).name
+          : `${Date.now()}-${Math.round(Math.random() * 1E9)}-${i}`;
         let outputFilename;
         let downloadUrl;
 
+        // On Vercel/serverless, skip disk storage (read-only filesystem)
+        const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
         if (outputFormat === 'svg') {
           outputFilename = `${baseName}.svg`;
-          await storageService.saveSVG(svgContent, outputFilename);
+          if (!isServerless) {
+            await storageService.saveSVG(svgContent, outputFilename);
+          }
           downloadUrl = `/api/download/${outputFilename}`;
         } else if (outputFormat === 'png') {
           // Convert SVG to PNG using Sharp
@@ -393,18 +409,21 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
             .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
             .png()
             .toBuffer();
-          // Use storageService to save to the correct output folder
-          await storageService.saveFile(pngBuffer, outputFilename, 'output');
+          if (!isServerless) {
+            await storageService.saveFile(pngBuffer, outputFilename, 'output');
+          }
           downloadUrl = `/api/download/${outputFilename}`;
         } else if (outputFormat === 'pdf') {
-          // Save SVG first, then we'll convert on download
           outputFilename = `${baseName}.svg`;
-          await storageService.saveSVG(svgContent, outputFilename);
-          // For PDF, we save SVG but provide PDF download URL
+          if (!isServerless) {
+            await storageService.saveSVG(svgContent, outputFilename);
+          }
           downloadUrl = `/api/download/${baseName}.pdf?source=${outputFilename}`;
         } else {
           outputFilename = `${baseName}.svg`;
-          await storageService.saveSVG(svgContent, outputFilename);
+          if (!isServerless) {
+            await storageService.saveSVG(svgContent, outputFilename);
+          }
           downloadUrl = `/api/download/${outputFilename}`;
         }
 
@@ -413,6 +432,7 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
           originalFilename: file.originalname,
           outputFilename,
           downloadUrl,
+          svgContent: outputFormat === 'svg' ? svgContent : undefined,
           format: outputFormat,
         };
 
