@@ -92,7 +92,9 @@ function AppContent() {
       }
     } catch (err) {
       console.error('Vectorization error:', err);
-      setError(err.message || 'An error occurred during vectorization');
+      // Extract error message from Axios error response or use fallback
+      const errorMessage = err.response?.data?.message || err.message || 'An error occurred during vectorization';
+      setError(errorMessage);
       setStep('upload');
     }
   };
