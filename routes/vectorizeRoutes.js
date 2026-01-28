@@ -46,7 +46,8 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
         ...options
       } = req.body;
 
-      let imageBuffer = await fs.readFile(req.file.path);
+      // Get image buffer - handle both memory storage (Vercel) and disk storage (local)
+      let imageBuffer = req.file.buffer || await fs.readFile(req.file.path);
 
       // Convert PDF to image if needed
       if (req.file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
@@ -69,8 +70,8 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
       const cachedResult = cacheService.getSVG(cacheKey);
 
       if (cachedResult) {
-        // Clean up uploaded file
-        await fs.unlink(req.file.path).catch(() => {});
+        // Clean up uploaded file (only if using disk storage)
+        if (req.file.path) await fs.unlink(req.file.path).catch(() => {});
 
         return res.json({
           success: true,
@@ -192,8 +193,8 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
       // Analyze SVG
       const svgAnalysis = svgOptimizer.analyze(svgToSave);
 
-      // Clean up uploaded file
-      await fs.unlink(req.file.path).catch(() => {});
+      // Clean up uploaded file (only if using disk storage)
+      if (req.file.path) await fs.unlink(req.file.path).catch(() => {});
 
       const duration = Date.now() - startTime;
 
@@ -244,7 +245,7 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
     } catch (error) {
       console.error('Vectorization error:', error);
 
-      if (req.file) {
+      if (req.file?.path) {
         await fs.unlink(req.file.path).catch(() => {});
       }
 
@@ -306,7 +307,8 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
           currentIndex: i,
         });
 
-        let imageBuffer = await fs.readFile(file.path);
+        // Get image buffer - handle both memory storage (Vercel) and disk storage (local)
+        let imageBuffer = file.buffer || await fs.readFile(file.path);
 
         // Convert PDF to image if needed
         if (file.mimetype === 'application/pdf' || pdfConverter.isPdf(imageBuffer)) {
@@ -428,8 +430,8 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
         websocketService.addJobError(jobId, errorResult);
       }
 
-      // Clean up uploaded file
-      await fs.unlink(file.path).catch(() => {});
+      // Clean up uploaded file (only if using disk storage)
+      if (file.path) await fs.unlink(file.path).catch(() => {});
     }
 
     const successCount = results.filter(r => r.success).length;
@@ -637,7 +639,7 @@ router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => 
     try {
       // Check if background removal is available
       if (!backgroundRemovalService.isAvailable()) {
-        await fs.unlink(req.file.path).catch(() => {});
+        if (req.file?.path) await fs.unlink(req.file.path).catch(() => {});
         return res.status(503).json({
           success: false,
           error: 'Background removal service is not available',
@@ -649,7 +651,8 @@ router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => 
       const quality = req.body.quality || 'balanced';
       const threshold = req.body.threshold ? parseFloat(req.body.threshold) : undefined;
 
-      let imageBuffer = await fs.readFile(req.file.path);
+      // Get image buffer - handle both memory storage (Vercel) and disk storage (local)
+      let imageBuffer = req.file.buffer || await fs.readFile(req.file.path);
       let mimeType = req.file.mimetype;
 
       // Convert PDF to image if needed
@@ -668,8 +671,8 @@ router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => 
       });
       console.log('Background removal completed');
 
-      // Clean up uploaded file
-      await fs.unlink(req.file.path).catch(() => {});
+      // Clean up uploaded file (only if using disk storage)
+      if (req.file?.path) await fs.unlink(req.file.path).catch(() => {});
 
       res.json({
         success: true,
@@ -681,7 +684,7 @@ router.post('/remove-background', requireAuth, asyncHandler(async (req, res) => 
     } catch (error) {
       console.error('Background removal error:', error);
 
-      if (req.file) {
+      if (req.file?.path) {
         await fs.unlink(req.file.path).catch(() => {});
       }
 
@@ -725,9 +728,11 @@ router.post('/remove-background-with-mask', requireAuth, asyncHandler(async (req
       const mode = req.body.mode || 'refine'; // 'refine' or 'within'
       const feather = parseInt(req.body.feather) || 0;
 
-      // Read image and mask
-      const imageBuffer = await fs.readFile(req.files.image[0].path);
-      const maskBuffer = await fs.readFile(req.files.mask[0].path);
+      // Read image and mask - handle both memory storage (Vercel) and disk storage (local)
+      const imageFile = req.files.image[0];
+      const maskFile = req.files.mask[0];
+      const imageBuffer = imageFile.buffer || await fs.readFile(imageFile.path);
+      const maskBuffer = maskFile.buffer || await fs.readFile(maskFile.path);
 
       // Get image dimensions
       const imageMetadata = await sharp(imageBuffer).metadata();
@@ -761,7 +766,7 @@ router.post('/remove-background-with-mask', requireAuth, asyncHandler(async (req
       if (mode === 'within' && backgroundRemovalService.isAvailable()) {
         // Mode: AI removes background only within the masked region
         // First, apply AI to the whole image
-        const dataUri = replicateService.bufferToDataUri(imageBuffer, req.files.image[0].mimetype);
+        const dataUri = replicateService.bufferToDataUri(imageBuffer, imageFile.mimetype);
         const processedDataUri = await backgroundRemovalService.removeBackground(dataUri);
 
         // Convert AI result back to buffer
@@ -832,9 +837,9 @@ router.post('/remove-background-with-mask', requireAuth, asyncHandler(async (req
       // Convert result to data URI
       const resultDataUri = `data:image/png;base64,${resultBuffer.toString('base64')}`;
 
-      // Clean up temp files
-      await fs.unlink(req.files.image[0].path).catch(() => {});
-      await fs.unlink(req.files.mask[0].path).catch(() => {});
+      // Clean up temp files (only if using disk storage)
+      if (imageFile.path) await fs.unlink(imageFile.path).catch(() => {});
+      if (maskFile.path) await fs.unlink(maskFile.path).catch(() => {});
 
       res.json({
         success: true,
@@ -846,11 +851,11 @@ router.post('/remove-background-with-mask', requireAuth, asyncHandler(async (req
     } catch (error) {
       console.error('Background removal with mask error:', error);
 
-      // Clean up temp files
-      if (req.files?.image?.[0]) {
+      // Clean up temp files (only if using disk storage)
+      if (req.files?.image?.[0]?.path) {
         await fs.unlink(req.files.image[0].path).catch(() => {});
       }
-      if (req.files?.mask?.[0]) {
+      if (req.files?.mask?.[0]?.path) {
         await fs.unlink(req.files.mask[0].path).catch(() => {});
       }
 
