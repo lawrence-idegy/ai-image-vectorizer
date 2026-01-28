@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
-import { downloadSVGFile, exportAsAI, exportAsEPS } from '../utils/exportUtils';
+import { downloadSVGFile, exportAsAI, exportAsEPS, exportAsPDF } from '../utils/exportUtils';
 
 // Auto-naming helper functions
 function sanitizeFilename(str) {
@@ -63,6 +63,17 @@ function DownloadResults({ svgContent, clientName, projectName, onStartOver }) {
       const { width, height } = getSvgDimensions();
       const filename = generateFilename(clientName, projectName, 'ai');
       await exportAsAI(svgContent, width, height, filename);
+    } finally {
+      setTimeout(() => setDownloading(null), 500);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    setDownloading('pdf');
+    try {
+      const { width, height } = getSvgDimensions();
+      const filename = generateFilename(clientName, projectName, 'pdf');
+      await exportAsPDF(svgContent, width, height, filename);
     } finally {
       setTimeout(() => setDownloading(null), 500);
     }
@@ -155,7 +166,7 @@ function DownloadResults({ svgContent, clientName, projectName, onStartOver }) {
         </div>
 
         {/* Download Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
           {/* AI/EPS Button */}
           <button
             onClick={handleDownloadAI}
@@ -170,6 +181,25 @@ function DownloadResults({ svgContent, clientName, projectName, onStartOver }) {
                 <div className="text-left sm:text-center">
                   <span className="font-semibold">AI/EPS</span>
                   <span className="text-xs text-white/70 dark:text-idegy-navy/60 sm:mt-1 ml-2 sm:ml-0 sm:block">Illustrator</span>
+                </div>
+              </>
+            )}
+          </button>
+
+          {/* PDF Button */}
+          <button
+            onClick={handleDownloadPDF}
+            disabled={downloading}
+            className="group relative flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-4 sm:p-6 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-2xl hover:border-idegy-navy dark:hover:border-idegy-blue hover:text-idegy-navy dark:hover:text-idegy-blue transition-all shadow-md hover:shadow-lg dark:shadow-black/30 hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
+          >
+            {downloading === 'pdf' ? (
+              <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
+            ) : (
+              <>
+                <Icon icon="mdi:file-pdf-box" className="w-8 h-8 sm:mb-2" />
+                <div className="text-left sm:text-center">
+                  <span className="font-semibold">PDF</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 sm:mt-1 ml-2 sm:ml-0 sm:block">Print</span>
                 </div>
               </>
             )}
