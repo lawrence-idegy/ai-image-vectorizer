@@ -120,17 +120,15 @@ async function initPdfJs() {
   if (initError) throw initError;
 
   try {
-    // Dynamic import for ES module compatibility
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    // Use CommonJS require for better Node.js compatibility
+    const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
 
-    // Disable worker to avoid module loading issues on serverless
-    // This runs PDF processing in the main thread which is fine for serverless
-    if (pdfjs.GlobalWorkerOptions) {
-      pdfjs.GlobalWorkerOptions.workerSrc = '';
-    }
+    // Disable worker completely by setting workerPort to null
+    // and using the fake worker mode
+    pdfjs.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
 
     pdfjsLib = pdfjs;
-    console.log('pdfjs-dist initialized successfully (worker disabled)');
+    console.log('pdfjs-dist initialized with CJS build');
     return pdfjsLib;
   } catch (error) {
     console.error('Failed to initialize pdfjs-dist:', error.message);
