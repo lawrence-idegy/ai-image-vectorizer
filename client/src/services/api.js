@@ -204,6 +204,23 @@ export const getHealth = async () => {
   return response.data;
 };
 
+// Debug upload - test file upload functionality
+export const debugUpload = async (file) => {
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('test', 'debug-value');
+
+  console.log('[debugUpload] Sending file:', file.name, file.size, file.type);
+  const response = await api.post('/debug-upload', formData);
+  console.log('[debugUpload] Response:', response.data);
+  return response.data;
+};
+
+// Make debugUpload available globally for console testing
+if (typeof window !== 'undefined') {
+  window.debugUpload = debugUpload;
+}
+
 // Stats (admin)
 export const getStats = async () => {
   const response = await api.get('/stats');

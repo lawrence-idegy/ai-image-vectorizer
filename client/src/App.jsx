@@ -19,7 +19,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { ThemeProvider } from './contexts/ThemeContext';
 
 // API
-import { vectorizeImage, removeBackground } from './services/api';
+import { vectorizeImage, removeBackground, debugUpload } from './services/api';
 
 function AppContent() {
   // Flow state: 'upload' | 'processing' | 'cleanup' | 'complete'
@@ -56,11 +56,25 @@ function AppContent() {
     try {
       let processedFile = file;
 
+      // Debug: Test basic file upload first
+      console.log('[handleUpload] File info:', file.name, file.size, file.type);
+      try {
+        console.log('[handleUpload] Testing debug upload...');
+        const debugResult = await debugUpload(file);
+        console.log('[handleUpload] Debug upload success:', debugResult);
+      } catch (debugErr) {
+        console.error('[handleUpload] Debug upload failed:', debugErr);
+        console.error('[handleUpload] Debug error response:', debugErr.response?.data);
+        console.error('[handleUpload] Debug error status:', debugErr.response?.status);
+      }
+
       // Step 1: Remove background if requested
       if (shouldRemoveBg) {
         setProcessingStatus('Removing background...');
         try {
+          console.log('[handleUpload] Calling removeBackground...');
           const bgResult = await removeBackground(file, { quality: 'balanced' });
+          console.log('[handleUpload] removeBackground result:', bgResult);
           if (bgResult.success && bgResult.image) {
             // Convert data URI back to File
             const response = await fetch(bgResult.image);
@@ -68,13 +82,16 @@ function AppContent() {
             processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '_nobg.png'), { type: 'image/png' });
           }
         } catch (bgErr) {
-          console.warn('Background removal failed, continuing with original:', bgErr.message);
+          console.error('[handleUpload] Background removal error:', bgErr);
+          console.error('[handleUpload] BG error response:', bgErr.response?.data);
+          console.error('[handleUpload] BG error status:', bgErr.response?.status);
           // Continue with original file if background removal fails
         }
       }
 
       // Step 2: Vectorize the image using AI
       setProcessingStatus('Vectorizing with AI...');
+      console.log('[handleUpload] Calling vectorizeImage...');
 
       const vectorOptions = {
         method: 'ai',
@@ -83,6 +100,7 @@ function AppContent() {
       };
 
       const result = await vectorizeImage(processedFile, vectorOptions);
+      console.log('[handleUpload] vectorizeImage result:', result);
 
       if (result.success) {
         setSvgContent(result.svgContent);
