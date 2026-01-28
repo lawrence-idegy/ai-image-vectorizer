@@ -8,15 +8,10 @@ const Replicate = require('replicate');
 
 class BackgroundRemovalService {
   constructor() {
-    if (!process.env.REPLICATE_API_TOKEN) {
-      console.warn('REPLICATE_API_TOKEN not set - background removal will not be available');
-    }
+    this.available = false;
+    this.replicate = null;
 
-    this.replicate = new Replicate({
-      auth: process.env.REPLICATE_API_TOKEN,
-    });
-
-    // Available models with different quality/speed tradeoffs
+    // Available models with different quality/speed tradeoffs (defined first for getAvailableModels)
     this.models = {
       // Fast - Quick processing, good for simple backgrounds
       fast: {
@@ -47,6 +42,20 @@ class BackgroundRemovalService {
 
     // Default model
     this.defaultModel = 'balanced';
+
+    if (!process.env.REPLICATE_API_TOKEN) {
+      console.warn('REPLICATE_API_TOKEN not set - background removal will not be available');
+      return;
+    }
+
+    try {
+      this.replicate = new Replicate({
+        auth: process.env.REPLICATE_API_TOKEN,
+      });
+      this.available = true;
+    } catch (error) {
+      console.error('Failed to initialize Replicate client for background removal:', error.message);
+    }
   }
 
   /**
@@ -72,6 +81,10 @@ class BackgroundRemovalService {
    * @returns {Promise<string>} - Data URI of image with background removed
    */
   async removeBackground(imageDataUri, options = {}) {
+    if (!this.isAvailable()) {
+      throw new Error('Background removal service is not available - REPLICATE_API_TOKEN not configured');
+    }
+
     const quality = options.quality || this.defaultModel;
     const modelConfig = this.models[quality] || this.models[this.defaultModel];
 
@@ -133,7 +146,7 @@ class BackgroundRemovalService {
    * @returns {boolean}
    */
   isAvailable() {
-    return !!process.env.REPLICATE_API_TOKEN && !!this.replicate;
+    return this.available && !!this.replicate;
   }
 }
 
