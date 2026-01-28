@@ -26,7 +26,7 @@ function generateFilename(clientName, projectName, extension) {
   return `${client}_${project}_${timestamp}.${extension}`;
 }
 
-function DownloadResults({ svgContent, clientName, projectName, onStartOver }) {
+function DownloadResults({ svgContent, clientName, projectName, onStartOver, onBackToEdit }) {
   const [downloading, setDownloading] = useState(null);
 
   // Parse SVG dimensions for export
@@ -249,8 +249,17 @@ function DownloadResults({ svgContent, clientName, projectName, onStartOver }) {
           Files will be named: {generateFilename(clientName, projectName, 'svg').replace('.svg', '.*')}
         </div>
 
-        {/* Start Over Button */}
-        <div className="text-center">
+        {/* Navigation Buttons */}
+        <div className="flex items-center justify-center gap-4">
+          {onBackToEdit && (
+            <button
+              onClick={onBackToEdit}
+              className="inline-flex items-center gap-2 px-6 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+            >
+              <Icon icon="mdi:pencil" className="w-5 h-5" />
+              Back to Edit
+            </button>
+          )}
           <button
             onClick={onStartOver}
             className="inline-flex items-center gap-2 px-6 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"

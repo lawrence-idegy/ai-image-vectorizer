@@ -129,6 +129,11 @@ function AppContent() {
     handleStartOver();
   };
 
+  const handleBackToEdit = () => {
+    // Go back to cleanup editor with current SVG content
+    setStep('cleanup');
+  };
+
   // Show loading screen while checking authentication
   if (loading) {
     return (
@@ -224,6 +229,7 @@ function AppContent() {
             clientName={clientName}
             projectName={projectName}
             onStartOver={handleStartOver}
+            onBackToEdit={handleBackToEdit}
           />
         )}
       </main>
