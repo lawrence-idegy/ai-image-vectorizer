@@ -62,11 +62,8 @@ export const vectorizeImage = async (file, options = {}) => {
   if (options.optimize !== undefined) formData.append('optimize', options.optimize.toString());
   if (options.optimizeLevel) formData.append('optimizeLevel', options.optimizeLevel);
 
-  const response = await api.post('/vectorize', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // Don't set Content-Type manually - let browser set it with correct boundary
+  const response = await api.post('/vectorize', formData);
 
   return response.data;
 };
@@ -83,11 +80,8 @@ export const batchVectorize = async (files, options = {}) => {
   if (options.optimize) formData.append('optimize', options.optimize);
   if (options.outputFormat) formData.append('outputFormat', options.outputFormat);
 
-  const response = await api.post('/vectorize/batch', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // Don't set Content-Type manually - let browser set it with correct boundary
+  const response = await api.post('/vectorize/batch', formData);
 
   return response.data;
 };
@@ -126,11 +120,8 @@ export const removeBackground = async (file, options = {}) => {
   if (options.quality) formData.append('quality', options.quality);
   if (options.threshold !== undefined) formData.append('threshold', options.threshold.toString());
 
-  const response = await api.post('/remove-background', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // Don't set Content-Type manually - let browser set it with correct boundary
+  const response = await api.post('/remove-background', formData);
 
   return response.data;
 };
@@ -147,11 +138,8 @@ export const removeBackgroundWithMask = async (file, maskDataURL, options = {}) 
   if (options.mode) formData.append('mode', options.mode); // 'refine' or 'within'
   if (options.feather) formData.append('feather', options.feather.toString());
 
-  const response = await api.post('/remove-background-with-mask', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // Don't set Content-Type manually - let browser set it with correct boundary
+  const response = await api.post('/remove-background-with-mask', formData);
 
   return response.data;
 };

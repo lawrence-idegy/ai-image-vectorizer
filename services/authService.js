@@ -269,34 +269,34 @@ const authMiddleware = (options = {}) => {
   const authService = new AuthService();
 
   return (req, res, next) => {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader) {
-      if (required) {
-        throw new AuthenticationError('Authorization header required');
-      }
-      return next();
-    }
-
-    const parts = authHeader.split(' ');
-
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
-      throw new AuthenticationError('Invalid authorization format. Use: Bearer <token>');
-    }
-
-    const token = parts[1];
-
     try {
+      const authHeader = req.headers.authorization;
+
+      if (!authHeader) {
+        if (required) {
+          return next(new AuthenticationError('Authorization header required'));
+        }
+        return next();
+      }
+
+      const parts = authHeader.split(' ');
+
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        return next(new AuthenticationError('Invalid authorization format. Use: Bearer <token>'));
+      }
+
+      const token = parts[1];
+
       const decoded = authService.verifyToken(token);
 
       // Check if it's an access token
       if (decoded.type !== 'access') {
-        throw new AuthenticationError('Invalid token type');
+        return next(new AuthenticationError('Invalid token type'));
       }
 
       // Check role if specified
       if (roles.length > 0 && !roles.includes(decoded.role)) {
-        throw new AuthorizationError('Insufficient permissions');
+        return next(new AuthorizationError('Insufficient permissions'));
       }
 
       // Attach user to request
@@ -304,9 +304,9 @@ const authMiddleware = (options = {}) => {
       next();
     } catch (error) {
       if (error instanceof AuthenticationError || error instanceof AuthorizationError) {
-        throw error;
+        return next(error);
       }
-      throw new AuthenticationError('Invalid token');
+      return next(new AuthenticationError('Invalid token'));
     }
   };
 };
