@@ -43,7 +43,7 @@ function AppContent() {
   // Show login modal if not authenticated (after loading check)
   const needsAuth = !loading && !isAuthenticated;
 
-  const handleUpload = async ({ file, clientName: client, projectName: project, removeBackground: shouldRemoveBg }) => {
+  const handleUpload = async ({ file, clientName: client, projectName: project, removeBackground: shouldRemoveBg, mode = 'vectorize' }) => {
     // Double-check authentication
     if (!isAuthenticated) {
       setShowAuth(true);
@@ -59,6 +59,16 @@ function AppContent() {
     try {
       let processedFile = file;
 
+      // If the file is already an SVG, read it and go straight to cleanup
+      const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg');
+      if (isSvg) {
+        setProcessingStatus('Loading SVG...');
+        const svgText = await file.text();
+        setSvgContent(svgText);
+        setStep('cleanup');
+        return;
+      }
+
       // Step 0: Convert PDF to PNG on the client side (server can't process PDFs on Vercel)
       if (isPdfFile(file)) {
         setProcessingStatus('Converting PDF to image...');
@@ -69,8 +79,8 @@ function AppContent() {
         }
       }
 
-      // Step 1: Remove background if requested
-      if (shouldRemoveBg) {
+      // Step 1: Remove background if requested (vectorize mode only)
+      if (shouldRemoveBg && mode === 'vectorize') {
         setProcessingStatus('Removing background...');
         try {
           const bgResult = await removeBackground(processedFile, { quality: 'balanced' });
@@ -85,12 +95,12 @@ function AppContent() {
         }
       }
 
-      // Step 2: Vectorize the image using AI
-      setProcessingStatus('Vectorizing with AI...');
+      // Step 2: Vectorize the image
+      setProcessingStatus(mode === 'cleanup' ? 'Tracing image...' : 'Vectorizing with AI...');
 
       const vectorOptions = {
         method: 'ai',
-        optimize: true,
+        optimize: mode === 'vectorize',
         detailLevel: 'high',
       };
 

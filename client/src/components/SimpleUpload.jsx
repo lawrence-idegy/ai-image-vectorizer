@@ -9,9 +9,10 @@ function SimpleUpload({ onUpload, disabled }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [error, setError] = useState(null);
   const [removeBackground, setRemoveBackground] = useState(true);
+  const [mode, setMode] = useState('vectorize'); // 'vectorize' | 'cleanup'
 
-  const acceptedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-  const acceptedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+  const acceptedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'image/svg+xml'];
+  const acceptedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.svg'];
 
   const validateFile = (file) => {
     if (!file) return 'No file selected';
@@ -20,7 +21,7 @@ function SimpleUpload({ onUpload, disabled }) {
       acceptedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 
     if (!isValidType) {
-      return 'Please upload a JPG, PNG, WEBP, or PDF file';
+      return 'Please upload a JPG, PNG, WEBP, PDF, or SVG file';
     }
 
     // 50MB limit
@@ -93,7 +94,8 @@ function SimpleUpload({ onUpload, disabled }) {
       file: selectedFile,
       clientName: clientName.trim(),
       projectName: projectName.trim(),
-      removeBackground: removeBackground,
+      removeBackground: mode === 'vectorize' ? removeBackground : false,
+      mode,
     });
   };
 
@@ -131,7 +133,7 @@ function SimpleUpload({ onUpload, disabled }) {
           <input
             id="file-input"
             type="file"
-            accept=".jpg,.jpeg,.png,.webp,.pdf"
+            accept=".jpg,.jpeg,.png,.webp,.pdf,.svg"
             onChange={handleFileInput}
             className="hidden"
             disabled={disabled}
@@ -185,7 +187,7 @@ function SimpleUpload({ onUpload, disabled }) {
                 <p className="text-gray-500 dark:text-gray-400 mt-1">or click to browse</p>
               </div>
               <p className="text-sm text-gray-400 dark:text-gray-500">
-                JPG, PNG, WEBP, or PDF
+                JPG, PNG, WEBP, PDF, or SVG
               </p>
             </div>
           )}
@@ -201,7 +203,41 @@ function SimpleUpload({ onUpload, disabled }) {
 
         {/* Options */}
         <div className="mt-6 space-y-4">
-          {/* Image Type Toggle */}
+          {/* Processing Mode Toggle */}
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Processing mode</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => setMode('vectorize')}
+                disabled={disabled}
+                className={`flex-1 p-3 rounded-xl border-2 text-left transition-all hover:-translate-y-0.5 active:scale-[0.98] ${
+                  mode === 'vectorize'
+                    ? 'border-idegy-navy dark:border-idegy-blue bg-idegy-navy/5 dark:bg-idegy-blue/10'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 bg-white dark:bg-gray-700'
+                }`}
+              >
+                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Vectorize</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">AI-powered trace &amp; optimize</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('cleanup')}
+                disabled={disabled}
+                className={`flex-1 p-3 rounded-xl border-2 text-left transition-all hover:-translate-y-0.5 active:scale-[0.98] ${
+                  mode === 'cleanup'
+                    ? 'border-idegy-navy dark:border-idegy-blue bg-idegy-navy/5 dark:bg-idegy-blue/10'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 bg-white dark:bg-gray-700'
+                }`}
+              >
+                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Clean up only</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Trace, then manually remove parts</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Background handling - only show in vectorize mode */}
+          {mode === 'vectorize' && (
           <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Background handling</p>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -233,6 +269,7 @@ function SimpleUpload({ onUpload, disabled }) {
               </button>
             </div>
           </div>
+          )}
 
           {/* Client/Project Names */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -279,8 +316,8 @@ function SimpleUpload({ onUpload, disabled }) {
             }
           `}
         >
-          <Icon icon="mdi:vector-triangle" className="w-6 h-6" />
-          Upload & Vectorize
+          <Icon icon={mode === 'cleanup' ? 'mdi:pencil-ruler' : 'mdi:vector-triangle'} className="w-6 h-6" />
+          {mode === 'cleanup' ? 'Upload & Clean Up' : 'Upload & Vectorize'}
         </button>
       </div>
     </div>
