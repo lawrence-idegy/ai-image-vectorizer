@@ -231,7 +231,7 @@ function SimpleUpload({ onUpload, disabled }) {
                 }`}
               >
                 <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Clean up only</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Faithful trace, then manually edit</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Erase parts of the image, export as PNG</div>
               </button>
             </div>
           </div>

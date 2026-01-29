@@ -26,7 +26,7 @@ function generateFilename(clientName, projectName, extension) {
   return `${client}_${project}_${timestamp}.${extension}`;
 }
 
-function DownloadResults({ svgContent, clientName, projectName, onStartOver, onBackToEdit }) {
+function DownloadResults({ svgContent, clientName, projectName, onStartOver, onBackToEdit, isRasterMode, rasterDataUrl }) {
   const [downloading, setDownloading] = useState(null);
 
   // Parse SVG dimensions for export
@@ -84,44 +84,46 @@ function DownloadResults({ svgContent, clientName, projectName, onStartOver, onB
     try {
       const filename = generateFilename(clientName, projectName, 'png');
 
-      // Create a canvas to render SVG at high resolution
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const { width, height } = getSvgDimensions();
+      if (isRasterMode && rasterDataUrl) {
+        // Raster mode: download directly from the blob URL
+        const link = document.createElement('a');
+        link.href = rasterDataUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // SVG mode: render SVG to canvas at 2x
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const { width, height } = getSvgDimensions();
 
-      // 2x resolution for crisp output
-      const scale = 2;
-      canvas.width = width * scale;
-      canvas.height = height * scale;
-      ctx.scale(scale, scale);
+        const scale = 2;
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        ctx.scale(scale, scale);
 
-      // Create an image from SVG
-      const img = new Image();
-      const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
 
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = url;
-      });
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = url;
+        });
 
-      // DO NOT fill background - keep transparency
-      // ctx.fillStyle = 'white';
-      // ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
 
-      // Draw the image (transparency preserved)
-      ctx.drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-
-      // Download as PNG
-      const pngUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = pngUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+        const pngUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = pngUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } finally {
       setTimeout(() => setDownloading(null), 500);
     }
@@ -143,17 +145,29 @@ function DownloadResults({ svgContent, clientName, projectName, onStartOver, onB
               justifyContent: 'center',
             }}
           >
-            <div
-              className="preview-svg-container"
-              dangerouslySetInnerHTML={{ __html: svgContent }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                maxWidth: '100%',
-                maxHeight: '400px',
-              }}
-            />
+            {isRasterMode && rasterDataUrl ? (
+              <img
+                src={rasterDataUrl}
+                alt="Cleaned up image"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '400px',
+                  objectFit: 'contain',
+                }}
+              />
+            ) : (
+              <div
+                className="preview-svg-container"
+                dangerouslySetInnerHTML={{ __html: svgContent }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  maxWidth: '100%',
+                  maxHeight: '400px',
+                }}
+              />
+            )}
           </div>
         </div>
 
@@ -161,92 +175,119 @@ function DownloadResults({ svgContent, clientName, projectName, onStartOver, onB
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full mb-4 animate-success">
             <Icon icon="mdi:check-circle" className="w-5 h-5" />
-            Your logo is ready!
+            {isRasterMode ? 'Your image is ready!' : 'Your logo is ready!'}
           </div>
         </div>
 
         {/* Download Buttons */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
-          {/* AI/EPS Button */}
-          <button
-            onClick={handleDownloadAI}
-            disabled={downloading}
-            className="group relative flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-4 sm:p-6 bg-idegy-navy dark:bg-white text-white dark:text-idegy-navy rounded-2xl hover:bg-idegy-navy-dark dark:hover:bg-gray-100 transition-all shadow-md hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
-          >
-            {downloading === 'ai' ? (
-              <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
-            ) : (
-              <>
-                <Icon icon="mdi:adobe" className="w-8 h-8 sm:mb-2" />
-                <div className="text-left sm:text-center">
-                  <span className="font-semibold">AI/EPS</span>
-                  <span className="text-xs text-white/70 dark:text-idegy-navy/60 sm:mt-1 ml-2 sm:ml-0 sm:block">Illustrator</span>
-                </div>
-              </>
-            )}
-          </button>
+        {isRasterMode ? (
+          /* Raster mode: PNG-only download */
+          <div className="flex justify-center mb-8">
+            <button
+              onClick={handleDownloadPNG}
+              disabled={downloading}
+              className="flex flex-row items-center justify-center gap-3 p-4 sm:p-6 px-8 sm:px-12 bg-idegy-navy dark:bg-white text-white dark:text-idegy-navy rounded-2xl hover:bg-idegy-navy-dark dark:hover:bg-gray-100 transition-all shadow-md hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
+            >
+              {downloading === 'png' ? (
+                <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
+              ) : (
+                <>
+                  <Icon icon="mdi:file-image" className="w-8 h-8" />
+                  <div className="text-left">
+                    <span className="font-semibold text-lg">Download PNG</span>
+                    <span className="text-xs text-white/70 dark:text-idegy-navy/60 block mt-0.5">High-res with transparency</span>
+                  </div>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          /* SVG mode: all format buttons */
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+            {/* AI/EPS Button */}
+            <button
+              onClick={handleDownloadAI}
+              disabled={downloading}
+              className="group relative flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-4 sm:p-6 bg-idegy-navy dark:bg-white text-white dark:text-idegy-navy rounded-2xl hover:bg-idegy-navy-dark dark:hover:bg-gray-100 transition-all shadow-md hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
+            >
+              {downloading === 'ai' ? (
+                <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
+              ) : (
+                <>
+                  <Icon icon="mdi:adobe" className="w-8 h-8 sm:mb-2" />
+                  <div className="text-left sm:text-center">
+                    <span className="font-semibold">AI/EPS</span>
+                    <span className="text-xs text-white/70 dark:text-idegy-navy/60 sm:mt-1 ml-2 sm:ml-0 sm:block">Illustrator</span>
+                  </div>
+                </>
+              )}
+            </button>
 
-          {/* PDF Button */}
-          <button
-            onClick={handleDownloadPDF}
-            disabled={downloading}
-            className="group relative flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-4 sm:p-6 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-2xl hover:border-idegy-navy dark:hover:border-idegy-blue hover:text-idegy-navy dark:hover:text-idegy-blue transition-all shadow-md hover:shadow-lg dark:shadow-black/30 hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
-          >
-            {downloading === 'pdf' ? (
-              <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
-            ) : (
-              <>
-                <Icon icon="mdi:file-pdf-box" className="w-8 h-8 sm:mb-2" />
-                <div className="text-left sm:text-center">
-                  <span className="font-semibold">PDF</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 sm:mt-1 ml-2 sm:ml-0 sm:block">Print</span>
-                </div>
-              </>
-            )}
-          </button>
+            {/* PDF Button */}
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="group relative flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-4 sm:p-6 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-2xl hover:border-idegy-navy dark:hover:border-idegy-blue hover:text-idegy-navy dark:hover:text-idegy-blue transition-all shadow-md hover:shadow-lg dark:shadow-black/30 hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
+            >
+              {downloading === 'pdf' ? (
+                <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
+              ) : (
+                <>
+                  <Icon icon="mdi:file-pdf-box" className="w-8 h-8 sm:mb-2" />
+                  <div className="text-left sm:text-center">
+                    <span className="font-semibold">PDF</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 sm:mt-1 ml-2 sm:ml-0 sm:block">Print</span>
+                  </div>
+                </>
+              )}
+            </button>
 
-          {/* SVG Button */}
-          <button
-            onClick={handleDownloadSVG}
-            disabled={downloading}
-            className="group relative flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-4 sm:p-6 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-2xl hover:border-idegy-navy dark:hover:border-idegy-blue hover:text-idegy-navy dark:hover:text-idegy-blue transition-all shadow-md hover:shadow-lg dark:shadow-black/30 hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
-          >
-            {downloading === 'svg' ? (
-              <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
-            ) : (
-              <>
-                <Icon icon="mdi:vector-triangle" className="w-8 h-8 sm:mb-2" />
-                <div className="text-left sm:text-center">
-                  <span className="font-semibold">SVG</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 sm:mt-1 ml-2 sm:ml-0 sm:block">Web/Figma</span>
-                </div>
-              </>
-            )}
-          </button>
+            {/* SVG Button */}
+            <button
+              onClick={handleDownloadSVG}
+              disabled={downloading}
+              className="group relative flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-4 sm:p-6 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-2xl hover:border-idegy-navy dark:hover:border-idegy-blue hover:text-idegy-navy dark:hover:text-idegy-blue transition-all shadow-md hover:shadow-lg dark:shadow-black/30 hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
+            >
+              {downloading === 'svg' ? (
+                <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
+              ) : (
+                <>
+                  <Icon icon="mdi:vector-triangle" className="w-8 h-8 sm:mb-2" />
+                  <div className="text-left sm:text-center">
+                    <span className="font-semibold">SVG</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 sm:mt-1 ml-2 sm:ml-0 sm:block">Web/Figma</span>
+                  </div>
+                </>
+              )}
+            </button>
 
-          {/* PNG Button */}
-          <button
-            onClick={handleDownloadPNG}
-            disabled={downloading}
-            className="group relative flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-4 sm:p-6 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-2xl hover:border-idegy-navy dark:hover:border-idegy-blue hover:text-idegy-navy dark:hover:text-idegy-blue transition-all shadow-md hover:shadow-lg dark:shadow-black/30 hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
-          >
-            {downloading === 'png' ? (
-              <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
-            ) : (
-              <>
-                <Icon icon="mdi:file-image" className="w-8 h-8 sm:mb-2" />
-                <div className="text-left sm:text-center">
-                  <span className="font-semibold">PNG</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 sm:mt-1 ml-2 sm:ml-0 sm:block">High-res</span>
-                </div>
-              </>
-            )}
-          </button>
-        </div>
+            {/* PNG Button */}
+            <button
+              onClick={handleDownloadPNG}
+              disabled={downloading}
+              className="group relative flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-4 sm:p-6 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-2xl hover:border-idegy-navy dark:hover:border-idegy-blue hover:text-idegy-navy dark:hover:text-idegy-blue transition-all shadow-md hover:shadow-lg dark:shadow-black/30 hover:-translate-y-1 active:scale-[0.98] disabled:opacity-70"
+            >
+              {downloading === 'png' ? (
+                <Icon icon="mdi:loading" className="w-8 h-8 animate-spin" />
+              ) : (
+                <>
+                  <Icon icon="mdi:file-image" className="w-8 h-8 sm:mb-2" />
+                  <div className="text-left sm:text-center">
+                    <span className="font-semibold">PNG</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 sm:mt-1 ml-2 sm:ml-0 sm:block">High-res</span>
+                  </div>
+                </>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* File naming preview */}
         <div className="text-center text-sm text-gray-400 dark:text-gray-500 mb-6">
-          Files will be named: {generateFilename(clientName, projectName, 'svg').replace('.svg', '.*')}
+          {isRasterMode
+            ? `File: ${generateFilename(clientName, projectName, 'png')}`
+            : `Files will be named: ${generateFilename(clientName, projectName, 'svg').replace('.svg', '.*')}`
+          }
         </div>
 
         {/* Navigation Buttons */}

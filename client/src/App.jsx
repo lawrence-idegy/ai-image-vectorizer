@@ -7,6 +7,7 @@ import Header from './components/Layout/Header';
 import SimpleUpload from './components/SimpleUpload';
 import Processing from './components/Processing';
 import CleanupEditor from './components/CleanupEditor';
+import RasterCleanupEditor from './components/RasterCleanupEditor';
 import DownloadResults from './components/DownloadResults';
 
 // Auth Components
@@ -23,7 +24,6 @@ import { vectorizeImage, removeBackground } from './services/api';
 
 // Utils
 import { convertPdfToImage, isPdfFile } from './utils/pdfToImage';
-import { traceImageToSvg } from './utils/imageTracer';
 
 function AppContent() {
   // Flow state: 'upload' | 'processing' | 'cleanup' | 'complete'
@@ -36,6 +36,11 @@ function AppContent() {
   const [clientName, setClientName] = useState('');
   const [projectName, setProjectName] = useState('');
   const [svgContent, setSvgContent] = useState(null);
+
+  // Raster cleanup mode state
+  const [isRasterMode, setIsRasterMode] = useState(false);
+  const [originalImageUrl, setOriginalImageUrl] = useState(null);
+  const [rasterDataUrl, setRasterDataUrl] = useState(null);
 
   // Auth - require login before accessing app
   const { user, loading, isAuthenticated, logout } = useAuth();
@@ -81,11 +86,12 @@ function AppContent() {
       }
 
       if (mode === 'cleanup') {
-        // Clean up only: trace locally in the browser (no AI, preserves detail)
-        setProcessingStatus('Tracing image...');
-        const svgResult = await traceImageToSvg(processedFile);
-        setSvgContent(svgResult);
+        // Clean up only: go straight to raster eraser editor (no tracing)
+        const objectUrl = URL.createObjectURL(processedFile);
+        setOriginalImageUrl(objectUrl);
+        setIsRasterMode(true);
         setStep('cleanup');
+        return;
       } else {
         // Vectorize mode: use AI via server
 
@@ -131,17 +137,28 @@ function AppContent() {
   };
 
   const handleStartOver = () => {
+    // Revoke object URLs to prevent memory leaks
+    if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
+    if (rasterDataUrl) URL.revokeObjectURL(rasterDataUrl);
+
     setStep('upload');
     setCurrentFile(null);
     setClientName('');
     setProjectName('');
     setSvgContent(null);
+    setIsRasterMode(false);
+    setOriginalImageUrl(null);
+    setRasterDataUrl(null);
     setError(null);
     setProcessingStatus('Processing...');
   };
 
-  const handleCleanupComplete = (cleanedSvg) => {
-    setSvgContent(cleanedSvg);
+  const handleCleanupComplete = (result) => {
+    if (isRasterMode) {
+      setRasterDataUrl(result);
+    } else {
+      setSvgContent(result);
+    }
     setStep('complete');
   };
 
@@ -236,7 +253,15 @@ function AppContent() {
           />
         )}
 
-        {step === 'cleanup' && svgContent && (
+        {step === 'cleanup' && isRasterMode && originalImageUrl && (
+          <RasterCleanupEditor
+            imageUrl={originalImageUrl}
+            onComplete={handleCleanupComplete}
+            onBack={handleCleanupBack}
+          />
+        )}
+
+        {step === 'cleanup' && !isRasterMode && svgContent && (
           <CleanupEditor
             svgContent={svgContent}
             onComplete={handleCleanupComplete}
@@ -244,13 +269,15 @@ function AppContent() {
           />
         )}
 
-        {step === 'complete' && svgContent && (
+        {step === 'complete' && (svgContent || rasterDataUrl) && (
           <DownloadResults
             svgContent={svgContent}
             clientName={clientName}
             projectName={projectName}
             onStartOver={handleStartOver}
             onBackToEdit={handleBackToEdit}
+            isRasterMode={isRasterMode}
+            rasterDataUrl={rasterDataUrl}
           />
         )}
       </main>
