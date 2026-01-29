@@ -23,6 +23,7 @@ import { vectorizeImage, removeBackground } from './services/api';
 
 // Utils
 import { convertPdfToImage, isPdfFile } from './utils/pdfToImage';
+import { traceImageToSvg } from './utils/imageTracer';
 
 function AppContent() {
   // Flow state: 'upload' | 'processing' | 'cleanup' | 'complete'
@@ -79,38 +80,48 @@ function AppContent() {
         }
       }
 
-      // Step 1: Remove background if requested (vectorize mode only)
-      if (shouldRemoveBg && mode === 'vectorize') {
-        setProcessingStatus('Removing background...');
-        try {
-          const bgResult = await removeBackground(processedFile, { quality: 'balanced' });
-          if (bgResult.success && bgResult.image) {
-            // Convert data URI back to File
-            const response = await fetch(bgResult.image);
-            const blob = await response.blob();
-            processedFile = new File([blob], processedFile.name.replace(/\.[^.]+$/, '_nobg.png'), { type: 'image/png' });
-          }
-        } catch (bgErr) {
-          // Continue with original file if background removal fails
-        }
-      }
-
-      // Step 2: Vectorize the image
-      setProcessingStatus(mode === 'cleanup' ? 'Tracing image...' : 'Vectorizing with AI...');
-
-      const vectorOptions = {
-        method: 'ai',
-        optimize: mode === 'vectorize',
-        detailLevel: 'high',
-      };
-
-      const result = await vectorizeImage(processedFile, vectorOptions);
-
-      if (result.success) {
-        setSvgContent(result.svgContent);
-        setStep('cleanup'); // Go to cleanup step first
+      if (mode === 'cleanup') {
+        // Clean up only: trace locally in the browser (no AI, preserves detail)
+        setProcessingStatus('Tracing image...');
+        const svgResult = await traceImageToSvg(processedFile);
+        setSvgContent(svgResult);
+        setStep('cleanup');
       } else {
-        throw new Error(result.message || 'Vectorization failed');
+        // Vectorize mode: use AI via server
+
+        // Step 1: Remove background if requested
+        if (shouldRemoveBg) {
+          setProcessingStatus('Removing background...');
+          try {
+            const bgResult = await removeBackground(processedFile, { quality: 'balanced' });
+            if (bgResult.success && bgResult.image) {
+              // Convert data URI back to File
+              const response = await fetch(bgResult.image);
+              const blob = await response.blob();
+              processedFile = new File([blob], processedFile.name.replace(/\.[^.]+$/, '_nobg.png'), { type: 'image/png' });
+            }
+          } catch (bgErr) {
+            // Continue with original file if background removal fails
+          }
+        }
+
+        // Step 2: Vectorize with AI
+        setProcessingStatus('Vectorizing with AI...');
+
+        const vectorOptions = {
+          method: 'ai',
+          optimize: true,
+          detailLevel: 'high',
+        };
+
+        const result = await vectorizeImage(processedFile, vectorOptions);
+
+        if (result.success) {
+          setSvgContent(result.svgContent);
+          setStep('cleanup');
+        } else {
+          throw new Error(result.message || 'Vectorization failed');
+        }
       }
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'An error occurred during vectorization';
