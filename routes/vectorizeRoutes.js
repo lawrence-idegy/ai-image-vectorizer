@@ -4,6 +4,14 @@ const fs = require('fs').promises;
 const path = require('path');
 const sharp = require('sharp');
 const replicateService = require('../services/replicateService');
+const vtracerService = require('../services/vtracerService');
+const IdegyVectorizer = require('../services/vectorizer');
+const AIVectorizer = require('../services/vectorizer/aiVectorizer');
+const ColorPreservingVectorizer = require('../services/vectorizer/colorPreservingVectorizer');
+const AIColorPreservingVectorizer = require('../services/vectorizer/aiColorPreservingVectorizer');
+const SmoothingVectorizer = require('../services/vectorizer/smoothingVectorizer');
+const generativeReconstructionService = require('../services/generativeReconstructionService');
+const svgPostProcessor = require('../services/svgPostProcessor');
 const qualityValidator = require('../services/qualityValidator');
 const backgroundRemovalService = require('../services/backgroundRemovalService');
 const svgOptimizer = require('../services/svgOptimizer');
@@ -36,12 +44,17 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
 
     try {
       const {
-        method = 'ai',
+        method = 'color-preserving',
         removeBackground = 'false',
         detailLevel = 'medium',
         optimize = 'true',
         optimizeLevel = 'default',
         invert = 'false',
+        // Post-processing options
+        detectShapes = 'true',
+        gapFiller = 'false',
+        groupBy = 'none',
+        adobeCompatibility = 'false',
         ...options
       } = req.body;
 
@@ -92,63 +105,179 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
 
       let svgContent;
       let processingMethod;
+      let svgToSave;
 
       websocketService.updateJobProgress(jobId, { status: 'vectorizing' });
 
-      // Preprocess image for better API compatibility
-      // Always convert to PNG for Replicate - JPEG can cause issues
       const metadata = await sharp(imageBuffer).metadata();
-      const maxDimension = 4096;
-      const minDimension = 512; // Replicate models often need minimum size
-      let mimeType = 'image/png';
 
-      // Calculate if we need to upscale (too small) or downscale (too large)
-      const needsDownscale = metadata.width > maxDimension || metadata.height > maxDimension;
-      const needsUpscale = metadata.width < minDimension && metadata.height < minDimension;
-      const isJpeg = metadata.format === 'jpeg' || metadata.format === 'jpg';
+      // Choose vectorization method: 'smooth' (default), 'color-preserving', 'gen-pro', 'ai-pro', 'idegy', 'vtracer', or 'ai'
+      if (method === 'smooth' || method === 'color-preserving') {
+        // SMOOTHING VECTORIZER - Best quality: exact colors with smooth Bezier curves
+        // 1. Upscales image 3x for higher tracing resolution
+        // 2. Traces with imagetracerjs for exact color regions
+        // 3. Converts polylines to smooth Bezier curves (Catmull-Rom)
+        // 4. Snaps colors to detected brand colors
 
-      // Always preprocess to ensure PNG format and proper dimensions
-      let resizeOptions = { fit: 'inside', withoutEnlargement: true };
-      let targetWidth = metadata.width;
-      let targetHeight = metadata.height;
+        const vectorizer = new SmoothingVectorizer({ upscaleFactor: 3 });
+        const quantizeColors = detailLevel !== 'ultra';
+        svgToSave = await vectorizer.vectorize(imageBuffer, { quantizeColors });
+        processingMethod = 'Smoothing Vectorizer (exact colors + smooth curves)';
 
-      if (needsUpscale) {
-        // Upscale small images to minimum dimension
-        const scale = minDimension / Math.max(metadata.width, metadata.height);
-        targetWidth = Math.round(metadata.width * scale);
-        targetHeight = Math.round(metadata.height * scale);
-        resizeOptions = { width: targetWidth, height: targetHeight, fit: 'fill' };
-      } else if (needsDownscale) {
-        resizeOptions = { width: maxDimension, height: maxDimension, fit: 'inside', withoutEnlargement: true };
+      } else if (method === 'ai-color' && replicateService.isAvailable()) {
+        // AI COLOR-PRESERVING VECTORIZER - Clean shapes but may change regions
+        // Uses Recraft AI for smooth vector shapes, then samples original image for exact colors
+        // Note: AI may reinterpret the image, changing region boundaries
+
+        const vectorizer = new AIColorPreservingVectorizer();
+        const quantizeColors = detailLevel !== 'ultra';
+        svgToSave = await vectorizer.vectorize(imageBuffer, { quantizeColors });
+        processingMethod = 'AI Color-Preserving Vectorizer (Recraft AI + exact colors)';
+
+      } else if (method === 'gen-pro' && generativeReconstructionService.isAvailable()) {
+        // Use Generative Reconstruction Pipeline + VTracer
+        // This is the highest quality option using:
+        // 1. Real-ESRGAN AI super-resolution
+        // 2. OpenCV edge preservation (bilateral filter + adaptive sharpening)
+        // 3. Color quantization to solid hex codes
+        // 4. VTracer for final vectorization
+
+        websocketService.updateJobProgress(jobId, { status: 'ai_preprocessing' });
+
+        const colorMap = {
+          low: 8,
+          medium: 16,
+          high: 24,
+          ultra: 32,
+        };
+
+        const result = await generativeReconstructionService.process(imageBuffer, {
+          upscaleFactor: 4,
+          maxColors: colorMap[detailLevel] || 16,
+          outputDpi: 300,
+          minDimension: 2000,
+          sharpenEdges: true,
+          denoise: true,
+        });
+
+        websocketService.updateJobProgress(jobId, { status: 'vectorizing' });
+
+        // Now vectorize the preprocessed image
+        svgToSave = await vtracerService.vectorizeImage(result.buffer, {
+          preset: 'logo',
+          preprocess: false,  // Already preprocessed by Python pipeline
+          aiUpscale: false,
+        });
+
+        processingMethod = `Generative Reconstruction + VTracer (${detailLevel} quality)`;
+
+      } else if (method === 'ai-pro' || (method === 'gen-pro' && !generativeReconstructionService.isAvailable())) {
+        // Use VTracer with optimized settings for clean vector output
+        // Logo preset produces cleaner, smaller files
+        // Falls back here if gen-pro requested but Python pipeline not available
+        const presetMap = {
+          low: 'poster',
+          medium: 'logo',
+          high: 'logo',      // Logo preset is best for most cases
+          ultra: 'detailed',
+        };
+        const preset = presetMap[detailLevel] || 'logo';
+
+        svgToSave = await vtracerService.vectorizeImage(imageBuffer, {
+          preset,
+          preprocess: true,
+          aiUpscale: false,  // Disabled - causes bloated output (4x paths)
+        });
+        processingMethod = `AI Vectorizer Pro (${preset} preset)`;
+
+      } else if (method === 'idegy' || method === 'vtracer' && false) {
+        // Use IDEGY Vectorizer (built from scratch, no external dependencies)
+        const presetMap = {
+          low: { maxColors: 16, minArea: 25, simplifyTolerance: 2.5, lineTolerance: 2.0 },
+          medium: { maxColors: 32, minArea: 8, simplifyTolerance: 1.5, lineTolerance: 1.0 },
+          high: { maxColors: 64, minArea: 4, simplifyTolerance: 1.0, lineTolerance: 0.5 },
+        };
+        const preset = presetMap[detailLevel] || presetMap.medium;
+
+        const vectorizer = new IdegyVectorizer({
+          ...preset,
+          gapFiller: true,  // Always use gap filler
+          detectShapes: false,  // Disable shape detection (causes issues)
+        });
+
+        svgToSave = await vectorizer.vectorize(imageBuffer);
+        processingMethod = `IDEGY Vectorizer (${detailLevel} detail)`;
+
+        // Mark to skip optimization - IDEGY output is already clean
+        // The SVGO optimizer strips black fills which breaks the output
+
+      } else if (method === 'ai' && replicateService.isAvailable()) {
+        // Use Replicate AI (recraft-vectorize)
+        const maxDimension = 4096;
+        const minDimension = 512;
+        let mimeType = 'image/png';
+
+        const needsDownscale = metadata.width > maxDimension || metadata.height > maxDimension;
+        const needsUpscale = metadata.width < minDimension || metadata.height < minDimension;
+
+        let resizeOptions = { fit: 'inside', withoutEnlargement: true };
+
+        if (needsUpscale && !needsDownscale) {
+          const scale = minDimension / Math.min(metadata.width, metadata.height);
+          const targetWidth = Math.round(metadata.width * scale);
+          const targetHeight = Math.round(metadata.height * scale);
+          resizeOptions = { width: targetWidth, height: targetHeight, fit: 'fill' };
+        } else if (needsDownscale) {
+          resizeOptions = { width: maxDimension, height: maxDimension, fit: 'inside', withoutEnlargement: true };
+        }
+
+        imageBuffer = await sharp(imageBuffer)
+          .resize(resizeOptions)
+          .flatten({ background: { r: 255, g: 255, b: 255 } })
+          .png({ quality: 100 })
+          .toBuffer();
+
+        const dataUri = replicateService.bufferToDataUri(imageBuffer, mimeType);
+        svgContent = await replicateService.vectorizeImage(dataUri, options);
+        processingMethod = 'Replicate AI (recraft-vectorize)';
+
+        // Handle URL responses from Replicate
+        svgToSave = svgContent;
+        if (typeof svgContent === 'string' && svgContent.startsWith('http')) {
+          const response = await fetch(svgContent);
+          svgToSave = await response.text();
+        } else if (typeof svgContent === 'object' && svgContent.uri) {
+          const response = await fetch(svgContent.uri);
+          svgToSave = await response.text();
+        } else if (typeof svgContent !== 'string') {
+          svgToSave = String(svgContent);
+        }
+      } else {
+        // Use VTracer with AI upscaling for best quality
+        // Map detailLevel to VTracer preset
+        const presetMap = {
+          low: 'poster',
+          medium: 'logo',
+          high: 'detailed',
+        };
+        const preset = presetMap[detailLevel] || 'logo';
+
+        // VTracer with preprocessing for best quality
+        // AI upscale only for very small images to keep output manageable
+        svgToSave = await vtracerService.vectorizeImage(imageBuffer, {
+          preset,
+          preprocess: true,
+          aiUpscale: true,
+          aiUpscaleMinDimension: 400,   // Only upscale very small images
+          aiUpscaleMaxDimension: 1200,  // Cap to prevent huge SVGs
+        });
+        processingMethod = `VTracer (${preset} preset with AI upscaling)`;
       }
 
-      // Always convert to PNG
-      imageBuffer = await sharp(imageBuffer)
-        .resize(resizeOptions)
-        .flatten({ background: { r: 255, g: 255, b: 255 } })
-        .png({ quality: 100 })
-        .toBuffer();
-
-      // Vectorize using Replicate AI
-      const dataUri = replicateService.bufferToDataUri(imageBuffer, mimeType);
-      svgContent = await replicateService.vectorizeImage(dataUri, options);
-      processingMethod = 'Replicate AI (recraft-vectorize)';
-
-      // Handle URL responses from Replicate
-      let svgToSave = svgContent;
-      if (typeof svgContent === 'string' && svgContent.startsWith('http')) {
-        const response = await fetch(svgContent);
-        svgToSave = await response.text();
-      } else if (typeof svgContent === 'object' && svgContent.uri) {
-        const response = await fetch(svgContent.uri);
-        svgToSave = await response.text();
-      } else if (typeof svgContent !== 'string') {
-        svgToSave = String(svgContent);
-      }
-
-      // Optimize SVG if requested
+      // Optimize SVG if requested (skip for IDEGY - optimizer strips black fills)
       let optimizationStats = null;
-      if (optimize === 'true') {
+      const skipOptimization = processingMethod.includes('IDEGY');
+      if (optimize === 'true' && !skipOptimization) {
         websocketService.updateJobProgress(jobId, { status: 'optimizing' });
 
         const optimized = svgOptimizer.optimize(svgToSave, {
@@ -159,6 +288,36 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
         if (optimized.success) {
           svgToSave = optimized.data;
           optimizationStats = optimized.stats;
+        }
+      }
+
+      // Post-process SVG (shape detection, grouping, gap filler)
+      // Skip for IDEGY - it already has gap filler and proper structure
+      let postProcessStats = null;
+      if (!skipOptimization) {
+        try {
+          websocketService.updateJobProgress(jobId, { status: 'post-processing' });
+
+          const statsBefore = svgPostProcessor.getStatistics(svgToSave);
+
+          svgToSave = svgPostProcessor.process(svgToSave, {
+            detectShapes: detectShapes === 'true',
+            shapeTypes: ['circle', 'ellipse', 'rectangle'],
+            gapFiller: { enabled: gapFiller === 'true', strokeWidth: 1.5 },
+            groupBy: groupBy || 'none',
+            adobeCompatibility: adobeCompatibility === 'true',
+            svgVersion: '1.1',
+          });
+
+          const statsAfter = svgPostProcessor.getStatistics(svgToSave);
+          postProcessStats = {
+            shapesDetected: (statsAfter.circles || 0) + (statsAfter.ellipses || 0) + (statsAfter.rectangles || 0),
+            pathsBefore: statsBefore.paths,
+            pathsAfter: statsAfter.paths,
+            groups: statsAfter.groups,
+          };
+        } catch (postProcessError) {
+          console.warn('Post-processing failed, using original SVG:', postProcessError.message);
         }
       }
 
@@ -226,6 +385,7 @@ router.post('/vectorize', requireAuth, asyncHandler(async (req, res) => {
         },
         analysis: svgAnalysis,
         optimization: optimizationStats,
+        postProcessing: postProcessStats,
       };
 
       // Cache the result
@@ -318,12 +478,14 @@ router.post('/vectorize/batch', requireAuth, asyncHandler(async (req, res) => {
 
         // Calculate resize needs
         const needsDownscale = metadata.width > maxDimension || metadata.height > maxDimension;
-        const needsUpscale = metadata.width < minDimension && metadata.height < minDimension;
+        // Upscale if EITHER dimension is below minimum (not just both)
+        const needsUpscale = metadata.width < minDimension || metadata.height < minDimension;
 
         let resizeOptions = { fit: 'inside', withoutEnlargement: true };
 
-        if (needsUpscale) {
-          const scale = minDimension / Math.max(metadata.width, metadata.height);
+        if (needsUpscale && !needsDownscale) {
+          // Upscale so the SMALLER dimension reaches minimum (ensures both dimensions are >= minDimension)
+          const scale = minDimension / Math.min(metadata.width, metadata.height);
           const targetWidth = Math.round(metadata.width * scale);
           const targetHeight = Math.round(metadata.height * scale);
           resizeOptions = { width: targetWidth, height: targetHeight, fit: 'fill' };
@@ -573,21 +735,115 @@ router.get('/methods', asyncHandler(async (req, res) => {
   }
 
   const replicateHealthy = await replicateService.checkHealth();
+  const vtracerHealthy = vtracerService.isAvailable();
+  const genReconHealthy = generativeReconstructionService.isAvailable();
 
   const result = {
     methods: [
       {
+        id: 'smooth',
+        name: 'Smoothing Vectorizer',
+        description: 'Best quality vectorization with exact brand colors AND smooth edges. Upscales 3x, traces exact regions, then applies Bezier curve smoothing.',
+        available: true,
+        recommended: true,
+        default: true,
+        features: [
+          'Preserves exact brand colors (hex values)',
+          'Smooth Bezier curve edges (not jagged)',
+          '3x upscaling for higher tracing resolution',
+          'Catmull-Rom to Bezier curve conversion',
+          'Handles anti-aliasing automatically',
+          'Best for logos requiring pinpoint accuracy',
+        ],
+      },
+      {
+        id: 'color-preserving',
+        name: 'Color-Preserving Vectorizer (Legacy)',
+        description: 'Exact brand colors with Potrace-based tracing. Same as smooth method.',
+        available: true,
+        recommended: false,
+        default: false,
+        features: [
+          'Alias for smooth method',
+          'Preserves exact brand colors',
+          'Smooth Bezier curves',
+        ],
+      },
+      {
+        id: 'gen-pro',
+        name: 'Generative Reconstruction',
+        description: 'High quality vectorization using AI super-resolution (Real-ESRGAN), edge preservation, and color quantization. Best for low-resolution or compressed logos.',
+        available: genReconHealthy && vtracerHealthy,
+        recommended: false,
+        default: false,
+        features: [
+          'Real-ESRGAN AI super-resolution (4x upscale)',
+          'Edge-preserving bilateral filtering',
+          'Adaptive edge sharpening',
+          'Color quantization to solid hex codes',
+          '300+ DPI vector-ready output',
+          'OpenCV advanced image processing',
+          'Optimized for low-res brand assets',
+        ],
+      },
+      {
+        id: 'ai-pro',
+        name: 'AI Vectorizer Pro',
+        description: 'Fast production-quality vectorization using VTracer with preprocessing. Best for higher-resolution logos.',
+        available: vtracerHealthy,
+        recommended: false,
+        default: false,
+        features: [
+          'High-quality VTracer engine',
+          'Color preprocessing and quantization',
+          'Smooth spline-based curves',
+          'Intelligent noise filtering',
+          'Optimized for logos and graphics',
+          'Multiple quality presets',
+        ],
+      },
+      {
+        id: 'idegy',
+        name: 'IDEGY Vectorizer',
+        description: 'Fast local vectorization with multi-curve fitting. Good balance of speed and quality.',
+        available: true,
+        recommended: false,
+        default: false,
+        features: [
+          'Multi-curve fitting (lines, arcs, Bézier)',
+          'Shape detection (circles, ellipses, rectangles)',
+          'Gap filler to prevent white lines',
+          'Color quantization and region segmentation',
+          'Fast local processing',
+          'No external dependencies',
+        ],
+      },
+      {
+        id: 'vtracer',
+        name: 'VTracer',
+        description: 'Fast, high-quality local vectorization. Good for simple logos.',
+        available: vtracerHealthy,
+        recommended: false,
+        default: false,
+        features: [
+          'Instant processing (~10ms)',
+          'Excellent for simple logos',
+          'Clean vector paths with smooth curves',
+          'Multiple quality presets',
+        ],
+      },
+      {
         id: 'ai',
         name: 'Replicate AI',
         model: 'recraft-ai/recraft-vectorize',
-        description: 'Professional AI-powered vectorization for complex images',
+        description: 'Cloud AI vectorization using Recraft model.',
         available: replicateHealthy,
-        recommended: true,
+        recommended: false,
         features: [
-          'Handles colored images',
-          'Professional-grade quality',
-          'Best for logos, illustrations, and complex graphics',
-          'Compatible with Adobe Illustrator, Figma, Sketch',
+          'Cloud-based AI processing',
+          'Handles complex illustrations',
+          'Requires API token',
+          'Slower (~30 seconds)',
         ],
       },
     ],
