@@ -1,53 +1,13 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "server-minimal.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxDuration": 60,
-        "includeFiles": [
-          "services/**",
-          "routes/**",
-          "middleware/**",
-          "utils/**"
-        ]
-      }
-    },
-    {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
+  "buildCommand": "cd client && npm install && npm run build",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/server-minimal.js"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/client/assets/$1",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/index.html",
-      "dest": "/client/index.html",
-      "headers": {
-        "Cache-Control": "no-cache, no-store, must-revalidate"
-      }
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/client/$1"
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 60
     }
-  ],
-  "installCommand": "npm install",
-  "env": {
-    "NODE_ENV": "production"
   }
 }
