@@ -9,42 +9,23 @@ const path = require('path');
 const fs = require('fs').promises;
 const http = require('http');
 
-// Wrap imports in try-catch for debugging on Vercel
-let securityMiddleware, corsOptions, sanitizeRequest, preventParamPollution;
-let apiLimiter, vectorizeLimiter, batchLimiter, downloadLimiter;
-let logger, requestLogger, errorHandler;
-let websocketService, cacheService, storageService;
-let vectorizeRoutes, formatRoutes, authRoutes;
+// Middleware
+const { securityMiddleware, corsOptions, sanitizeRequest, preventParamPollution } = require('./middleware/security');
+const { apiLimiter, vectorizeLimiter, batchLimiter, downloadLimiter } = require('./middleware/rateLimiter');
 
-try {
-  // Middleware
-  ({ securityMiddleware, corsOptions, sanitizeRequest, preventParamPollution } = require('./middleware/security'));
-  ({ apiLimiter, vectorizeLimiter, batchLimiter, downloadLimiter } = require('./middleware/rateLimiter'));
+// Utils
+const { logger, requestLogger } = require('./utils/logger');
+const { errorHandler } = require('./utils/errors');
 
-  // Utils
-  ({ logger, requestLogger } = require('./utils/logger'));
-  ({ errorHandler } = require('./utils/errors'));
+// Services
+const websocketService = require('./services/websocketService');
+const cacheService = require('./services/cacheService');
+const storageService = require('./services/storageService');
 
-  // Services
-  websocketService = require('./services/websocketService');
-  cacheService = require('./services/cacheService');
-  storageService = require('./services/storageService');
-
-  // Routes
-  vectorizeRoutes = require('./routes/vectorizeRoutes');
-  formatRoutes = require('./routes/formatRoutes');
-  authRoutes = require('./routes/authRoutes');
-} catch (importError) {
-  console.error('IMPORT ERROR:', importError.message);
-  console.error('Stack:', importError.stack);
-  // Create minimal fallback for Vercel to show error
-  const minimalApp = express();
-  minimalApp.get('*', (req, res) => {
-    res.status(500).json({ error: 'Import failed', message: importError.message, stack: importError.stack });
-  });
-  module.exports = minimalApp;
-  throw importError; // Re-throw to ensure Vercel sees the error
-}
+// Routes
+const vectorizeRoutes = require('./routes/vectorizeRoutes');
+const formatRoutes = require('./routes/formatRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;

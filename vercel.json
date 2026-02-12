@@ -2,10 +2,16 @@
   "version": 2,
   "builds": [
     {
-      "src": "server-minimal.js",
+      "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "maxDuration": 60
+        "maxDuration": 60,
+        "includeFiles": [
+          "services/**",
+          "routes/**",
+          "middleware/**",
+          "utils/**"
+        ]
       }
     },
     {
@@ -19,7 +25,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/server-minimal.js"
+      "dest": "/server.js"
     },
     {
       "src": "/assets/(.*)",
@@ -40,6 +46,7 @@
       "dest": "/client/$1"
     }
   ],
+  "installCommand": "npm install",
   "env": {
     "NODE_ENV": "production"
   }
