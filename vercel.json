@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.js",
+      "src": "server-minimal.js",
       "use": "@vercel/node",
       "config": {
         "maxDuration": 60
@@ -19,7 +19,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/server.js"
+      "dest": "/server-minimal.js"
     },
     {
       "src": "/assets/(.*)",
