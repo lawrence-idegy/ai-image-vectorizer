@@ -300,7 +300,9 @@ class SmoothingVectorizer {
 
   /**
    * Clean up SVG for Adobe Illustrator compatibility
-   * Removes problematic attributes that cause selection/visibility issues
+   * - Removes problematic attributes
+   * - Splits compound paths into individual paths for selectability
+   * - Adds unique IDs to each path
    */
   cleanupForIllustrator(svgContent) {
     // Remove opacity="0" which makes paths invisible/unselectable
@@ -317,7 +319,47 @@ class SmoothingVectorizer {
     svgContent = svgContent.replace(/ stroke="none"/g, '');
     svgContent = svgContent.replace(/ opacity="1"/g, '');
 
+    // Split compound paths (paths with multiple M commands) into separate paths
+    svgContent = this.splitCompoundPaths(svgContent);
+
+    // Add unique IDs to each path for better Illustrator handling
+    let pathIndex = 0;
+    svgContent = svgContent.replace(/<path /g, () => {
+      pathIndex++;
+      return `<path id="path${pathIndex}" `;
+    });
+
     return svgContent;
+  }
+
+  /**
+   * Split compound paths (paths with multiple M commands) into separate path elements
+   * This ensures each shape is individually selectable in Illustrator
+   */
+  splitCompoundPaths(svgContent) {
+    return svgContent.replace(/<path([^>]*)d="([^"]+)"([^>]*)\/>/g, (match, before, d, after) => {
+      // Count M commands
+      const mMatches = d.match(/M\s/g);
+      if (!mMatches || mMatches.length <= 1) {
+        return match; // Not a compound path
+      }
+
+      // Split the path data at each M command
+      const subPaths = [];
+      let currentPath = '';
+      const commands = d.split(/(?=M\s)/);
+
+      for (const cmd of commands) {
+        if (cmd.trim()) {
+          subPaths.push(cmd.trim());
+        }
+      }
+
+      // Generate separate path elements for each sub-path
+      return subPaths.map(subPath => {
+        return `<path${before}d="${subPath}"${after}/>`;
+      }).join('\n');
+    });
   }
 
   updateViewBox(svgContent, width, height) {
